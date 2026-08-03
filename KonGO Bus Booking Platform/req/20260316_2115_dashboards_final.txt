@@ -1,0 +1,15 @@
+Date: 2026-03-16 21:15
+Utilisateur: macla
+Requête: Finalisation des dashboards par rôles, routage Supabase, et boutons de déconnexion.
+
+Travail effectué:
+1. Mise à jour de PageRenderer.tsx pour inclure le routage intelligent par rôle (Superuser, Agence, Chauffeur).
+2. Correction du handleLogin dans AppHelpers.ts pour récupérer le rôle réel depuis la table 'profiles' de Supabase après la connexion.
+3. Amélioration du SuperuserDashboard avec ajout d'un bouton de déconnexion direct et drilldown amélioré.
+4. Amélioration de l'AgencyDashboard avec ajout d'un bouton de déconnexion et correction de la structure JSX.
+5. Mise à jour du DriverDashboard avec ajout du bouton de déconnexion pour faciliter les tests multi-comptes.
+6. Vérification du flux de validation de ticket par le chauffeur (mise à jour du statut dans Supabase).
+7. Nettoyage et vérification de la cohérence globale.
+
+Statut: Terminé et prêt pour test utilisateur.
+Agent: Agent Dev Web (via Loki Orchestrator)

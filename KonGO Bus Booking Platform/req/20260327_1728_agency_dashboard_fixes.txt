@@ -1,0 +1,25 @@
+# 📜 [Agent Archiviste] - Log de Session 2026-03-27_1728
+
+## 🎯 Demande Utilisateur
+1. Corriger le problème de blocage sur la page "Compte non lié" qui forçait l'utilisateur à vider manuellement les caches pour relancer le site.
+2. Ajouter une restriction fonctionnelle : Un chauffeur ne peut pas être affecté à plusieurs bus, et un bus ne peut pas être affecté à plusieurs chauffeurs. Il faut obligatoirement retirer (séparer) l'affectation existante avant de pouvoir en faire une nouvelle. Ne pas toucher au design existant.
+
+## 🛠️ Travail Effectué
+
+### 1. Dashboard Agence (`AgencyDashboard.tsx`) - Correction Blocage "Compte non lié"
+- **Problème identifié :** Lorsqu'un compte était connecté mais pas encore lié à une agence, le composant affichait un message sans aucune option de navigation ou de déconnexion.
+- **Solution :** Ajout d'un bouton "Se déconnecter" (LogOut) directement sur cet écran. Ce bouton appelle `supabase.auth.signOut()` puis recharge la page, vidant ainsi la session bloquée sans avoir à purger les caches du navigateur.
+
+### 2. Dashboard Agence (`AgencyDashboard.tsx`) - Logique d'affectation 1-pour-1 (Chauffeurs/Bus)
+- **Validation Côté Interface (Modal) :**
+  - Dans la liste des bus du modal d'affectation, les bus déjà affectés à un autre chauffeur sont désormais grisés, désactivés, et marqués de la mention `(Déjà affecté)`.
+- **Validation Logique (`assignDriverToBus`) :**
+  - Ajout d'une condition qui vérifie si le chauffeur a déjà un bus assigné (différent de celui cliqué). Si oui, une erreur `toast` lui demande de séparer d'abord le bus actuel.
+  - Ajout d'une condition qui vérifie si le bus cliqué appartient déjà à un autre chauffeur. Si oui, une erreur bloquante s'affiche.
+  - Seul le bouton "Retirer l'affectation" permet de se séparer d'un bus.
+
+## 📂 Fichiers Modifiés
+- `src/components/admin/AgencyDashboard.tsx`
+
+## ✅ Statut
+Les règles d'affectation strictes sont en place, et le blocage de session "Compte non lié" est résolu de manière élégante par l'ajout d'une action de déconnexion directe.

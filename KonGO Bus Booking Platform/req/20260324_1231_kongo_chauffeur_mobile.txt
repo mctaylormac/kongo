@@ -1,0 +1,44 @@
+[Agent Archiviste] - Rapport de session (2026-03-24 12:31)
+
+📝 Demande Initiale :
+- Créer un nouveau projet mobile "Kongo Chauffeur" (Expo React Native) dans C:\web\meji\kongo.
+- Pages à modéliser : Connexion, Scan & Validation (avec case à cocher), Historique.
+- Se connecter au Backend Supabase KonGO existant.
+
+🛠️ Travail Accompli :
+[Agent Dev Mobile] Scaffolding du projet :
+- Créé avec : npx create-expo-app@latest "../KongoChauffeur" --template blank-typescript
+- Dépendances installées : @supabase/supabase-js, expo-camera, expo-barcode-scanner,
+  @react-native-async-storage/async-storage, expo-secure-store, @react-navigation/native,
+  react-native-safe-area-context, react-native-screens
+
+[Agent Supabase] Migration BDD :
+- Création de la table `ticket_scans` avec migration "create_ticket_scans_table"
+- Colonnes : id, booking_id, trip_id, ticket_code, client_name, route, departure_time,
+  scan_status (valid/already_scanned/invalid/pending_sync), scanned_at, driver_id
+- RLS : policy INSERT et SELECT pour les chauffeurs authentifiés
+- Index sur driver_id, booking_id, scanned_at
+
+[Agent Dev Mobile] Fichiers créés :
+- App.tsx                              → Root app, auth session, tab navigation
+- src/lib/supabase.ts                  → Client Supabase avec AsyncStorage
+- src/types/index.ts                   → Types TicketScan, UserProfile
+- src/screens/LoginScreen.tsx          → Connexion + gestion erreurs
+- src/screens/ScanScreen.tsx           → Camera + QR scan + validation + case à cocher
+- src/screens/HistoryScreen.tsx        → Historique filtré + stats + badges statut
+
+📂 Structure du Projet :
+C:\web\meji\kongo\KongoChauffeur\
+├── App.tsx
+├── src/
+│   ├── lib/supabase.ts
+│   ├── types/index.ts
+│   └── screens/
+│       ├── LoginScreen.tsx
+│       ├── ScanScreen.tsx
+│       └── HistoryScreen.tsx
+├── package.json (avec expo, supabase, camera...)
+
+🚀 Pour démarrer :
+- cd C:\web\meji\kongo\KongoChauffeur
+- npm run android   (ou npm run web pour tester en browser)

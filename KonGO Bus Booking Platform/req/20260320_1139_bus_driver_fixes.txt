@@ -1,0 +1,17 @@
+[Agent Archiviste] - Rapport de session (2026-03-20 11:39)
+
+📝 Demande Initiale :
+- Créer un compte de connexion automatique (Supabase Auth) lors de l'enregistrement d'un chauffeur.
+- Filtrer la liste des véhicules dans l'ajout de voyage pour ne montrer que les bus de l'agence connectée.
+- Corriger l'erreur 400 lors de l'ajout d'un voyage.
+- Pré-sélectionner l'agence de l'utilisateur avec impossibilité de modification dans le formulaire d'ajout d'un bus.
+
+🛠️ Travail Accompli :
+- [Agent Supabase] Ajout des colonnes manquantes `departure_address`, `arrival_address` (TEXT) et `stops` (TEXT[]) dans la table `trips` via une requête MCP `ALTER TABLE` pour résoudre l'erreur 400.
+- [Agent Dev] Modification de `AddDriverForm` pour utiliser `supabase.auth.signUp()`. Génération d'un mot de passe provisoire affiché à l'écran.
+- [Agent Dev] Modification de `AddTripForm` : Filtrage dynamique des bus avec la méthode `.eq('agency_id', userAgencyId)` selon le rôle du compte courant.
+- [Agent Dev] Modification de `AddBusForm` : Si un accès agence est détecté, l'input Select `agencyId` est verrouillé et prérempli à sa déclaration.
+
+📂 Fichiers Impactés :
+- src/components/admin/AdminForms.tsx (AddDriverForm, AddTripForm, AddBusForm)
+- Base de données Supabase KonGO (Alter Table `trips`)

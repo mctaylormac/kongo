@@ -1,0 +1,17 @@
+# 📜 [Agent Archiviste] - Log de Session 2026-03-30_1120
+
+## 🎯 Demande Utilisateur
+Activation de la flotte d'agents via la commande `/meta-on`.
+
+## 🛠️ Travail Effectué
+
+### Audit & Initialisation
+- **Lecture du dernier log :** Analyse de la session du 27 mars (amélioration de la désaffectation chauffeur/bus).
+- **Analyse technique :** Vérification de `App.tsx`, `vite.config.ts` et de l'arborescence du projet.
+- **État des lieux :** Projet React/Vite/TS avec intégration Supabase, orienté transport (MaaS).
+
+## 📂 Fichiers Modifiés
+- `req/20260330_1120_meta_on.txt` (Création)
+
+## ✅ Statut
+La flotte est désormais **ACTIVE**. L'orchestrateur est prêt à recevoir des instructions spécifiques.

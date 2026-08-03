@@ -1,0 +1,17 @@
+# 📜 [Agent Archiviste] - Log de Session 2026-03-27_1736
+
+## 🎯 Demande Utilisateur
+Rendre la "séparation" (désaffectation) d'un chauffeur et d'un bus plus évidente, car l'utilisateur ne trouvait pas comment désaffecter un chauffeur qui a déjà un bus.
+
+## 🛠️ Travail Effectué
+
+### Dashboard Agence (`AgencyDashboard.tsx`) - Amélioration UI/UX Chauffeurs
+- **Ajout d'un bouton d'action rapide :** J'ai ajouté un bouton spécifique "Séparer / Retirer le bus" (icône orange `UserX`) directement sur la ligne de chaque chauffeur dans la liste de "Mon Équipe".
+- **Comportement Conditionnel :** Ce nouveau bouton n'apparaît **que** si le chauffeur est actuellement affecté à un bus. S'il n'a pas de bus, le bouton est caché.
+- **Réaction immédiate :** En cliquant dessus, le chauffeur est immédiatement séparé de son bus sans avoir à ouvrir le modal complet, rendant l'opération très rapide et explicite.
+
+## 📂 Fichiers Modifiés
+- `src/components/admin/AgencyDashboard.tsx`
+
+## ✅ Statut
+L'action de séparation est maintenant claire et mise en évidence directement dans l'interface principale de la liste des chauffeurs.

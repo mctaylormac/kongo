@@ -1,0 +1,27 @@
+[Agent Archiviste] - Rapport de session (2026-03-24 12:14)
+
+📝 Demande Initiale :
+- Erreur persistante 400 sur yzsujxyltodcoynkqxsv.supabase.co/rest/v1/bookings
+- PaymentFlow.tsx:344 Erreur lors de la création de la réservation: Object
+
+🔍 Cause Racine Identifiée :
+- La table `bookings` a une contrainte CHECK : payment_status IN ('pending','paid','failed','refunded')
+- Le code envoyait payment_status = 'completed' → VIOLATION DE CONTRAINTE → 400 Bad Request
+- Confirmation par test SQL direct : INSERT avec 'completed' → erreur "violates check constraint bookings_payment_status_check"
+- Confirmation par test SQL corrigé : INSERT avec 'paid' + status 'confirmed' → SUCCESS ✅
+
+🛠️ Travail Accompli :
+- [Agent Dev] Correction dans PaymentFlow.tsx :
+  * payment_status: 'completed' → 'paid' (conforme à la CHECK constraint)
+  * status: 'confirmed' ajouté (conforme à la CHECK constraint sur status)
+  * trip_id déplacé en haut du payload (toujours obligatoire maintenant)
+  * Guard préventif : si trip?.id est absent, le paiement est bloqué avec un message toast clair
+  * Logs améliorés : JSON.stringify complet de l'erreur pour faciliter le débogage futur
+
+📊 Validation finale :
+- Test SQL INSERT avec payload identique au code corrigé → SUCCESS ✅
+- booking_code='KGO_VALIDATE_...', payment_status='paid', status='confirmed' → créé en BDD ✅
+
+📂 Fichiers Impactés :
+- src/components/PaymentFlow.tsx (fix payment_status + guard trip_id + logs)
+- req/20260324_1210_booking_network_followup.txt (Ce log)

@@ -1,0 +1,30 @@
+[SESSION LOG: 2026-03-17 12:35]
+[AGENT: Meta-Agent & Agent Archiviste]
+
+## Demande du client:
+- Correction d'un problème de texte superposé sur la page de sélection de sièges (chevauchement et encodage).
+- Ajout de 20 enregistrements de voyages via le serveur MCP de Supabase à partir d'un script SQL.
+- Ajustement de l'espacement latéral des éléments du Dashboard Client.
+- Activation de l'Agent Archiviste.
+
+## Actions Réalisées :
+1. **Agent Dev Web** : 
+   - Modification de la structure de `UserDashboard.tsx` pour envelopper le profil et l'onglet (Tabs) dans des conteneurs qui ont un `max-w-7xl mx-auto px-4` pour qu'ils ne touchent plus le bord de l'écran. 
+   - Correction des caractères accentués (encodage UTF-8 cassé) dans le pop-up 'Astuce' de `App.tsx` ("sige" devien "siège", etc.).
+   - Remontée du pop-up d'outil "Astuce" en bas à droite pour qu'il ne chevauche plus le bouton support "Contact" (Quick Actions).
+
+2. **Agent Supabase (Data)** :
+   - Création du script `supabase/insert_trips.sql` qui utilise les UUID de nos agences (Kongo Premium, Express Congo, etc.) et de nos villes (Kinshasa, Lubumbashi, Goma, Matadi, Muanda) pour insérer des voyages.
+   - Exécution du script validée via `mcp_supabase-mcp-server_execute_sql`. 20 lignes ajoutées avec succès à la table `public.trips`.
+
+3. **Agent Archiviste** :
+   - Document de cette session et listage des fichiers modifiés.
+   - Création du log `20260317_1230_ui_fixes_trips.txt`.
+
+## Fichiers Impactés :
+- `/src/components/UserDashboard.tsx`
+- `/src/App.tsx`
+- `/supabase/insert_trips.sql` (Nouveau)
+- `/req/20260317_1230_ui_fixes_trips.txt` (Nouveau log)
+
+🏁 STATUS : PRÊT (QA Validé)

@@ -1,0 +1,15 @@
+[Agent Archiviste] - Rapport de session (2026-03-24 11:35)
+
+📝 Demande Initiale :
+- Analyser pourquoi une réservation de billet n'apparaît pas dans l'AgencyDashboard pour l'agence associée.
+- Exécuter la checklist depuis req/antigravity_booking_dashboard.md et produire les correctifs ou modifications BDD.
+
+🛠️ Travail Accompli :
+- [Agent QA/Supabase] Vérification des requêtes Supabase et du schéma de la table `bookings`.
+- [Meta-Agent/Agent Dev] Détection de l'erreur principale : `PaymentFlow.tsx` insérait des données avec des clés incorrectes (`booking_reference` au lieu de `booking_code`, `profile_id` au lieu de `user_id`), rendant la réservation invalide ou masquant l'erreur via un try/catch silencieux. 
+- [Agent Dev] Correction dans `PaymentFlow.tsx` : Mise à jour du payload avec `booking_code`, `user_id`, `passenger_count`, `seats`, `contact_email`, et `contact_phone` pour coller à la vraie structure de la BDD.
+- [Agent Dev] Renommage de l'objet variable `bookingReference` en `bookingCode` sur le frontend.
+
+📂 Fichiers Impactés :
+- src/components/PaymentFlow.tsx
+- req/20260324_1135_booking_dashboard.txt (Création du log)

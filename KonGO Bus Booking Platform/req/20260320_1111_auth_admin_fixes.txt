@@ -1,0 +1,23 @@
+[Agent Archiviste] - Rapport de session (2026-03-20 11:11)
+
+📝 Demande Initiale :
+- Restreindre l'accès de "Mes Voyages" aux utilisateurs connectés.
+- Ajouter les rubriques "escale", "adresse de départ" et "adresse d'arrivée" dans l'administration des voyages.
+- Corriger le menu mobile qui n'apparaît pas.
+- Supprimer "Mes Réservations" et "Routes Favorites" (à intégrer dans le profil/Mes Voyages).
+- Supprimer le menu Administration (accès via /admin).
+- Rediriger les admins, superusers, et chauffeurs vers la page de connexion s'ils ne sont pas connectés avant d'accéder au dashboard.
+
+🛠️ Travail Accompli :
+- [Agent Dev] Ajout d'une permission (Auth Guard) dans `App.tsx` pour empêcher les invités d'accéder à `dashboard` (Mes voyages) ou `admin-dashboard`.
+- [Agent Dev] Ajout de `departureAddress`, `arrivalAddress` et `stops` dans le formulaire `AddTripForm` dans `AdminForms.tsx` et transmission à la base de données via payload Supabase.
+- [Agent Dev/Stitch] Passage de `userRole` aux composants `Header`, `HeaderActions`, et `MobileMenu` pour un affichage conditionnel robuste.
+- [Agent Stitch] Mise à jour du composant `MobileMenu.tsx` pour n'afficher le lien "Mes Voyages" qu'aux utilisateurs connectés. Les utilisateurs non-connectés ne voient que les boutons de Connexion/Inscription de manière cohérente.
+- [Agent Stitch] Nettoyage de `HeaderActions.tsx` : Suppression de l'option Administration et fusion de l'accès aux options utilisateurs.
+
+📂 Fichiers Impactés :
+- src/App.tsx
+- src/components/Header.tsx
+- src/components/header/HeaderActions.tsx
+- src/components/header/MobileMenu.tsx
+- src/components/admin/AdminForms.tsx

@@ -1,0 +1,26 @@
+[SESSION LOG: 2026-03-18 08:30]
+[AGENT: Meta-Agent & Agent Archiviste]
+
+## Demande du client:
+1. Superuser: Créer des comptes admin pour les agences (gestion bus/voyages).
+2. Ticket: Afficher le nom de l'agence sur le ticket.
+3. Réservation: Rendre la connexion obligatoire pour réserver.
+4. Filtres (Page de recherche): Corriger la réinitialisation des filtres et du bouton de recherche.
+
+## Plan de Travail Initial :
+1. **Agent Brainstorming** : Analyse des flux pour la création de comptes et le blocage des réservations anonymes.
+2. **Agent Supabase** : Vérification schéma DB (Agencies, Profiles, Trips) pour l'affichage du nom d'agence et la création de comptes.
+3. **Agent Dev Web** :
+   - Dashboard Superuser (Gestion agences).
+   - Ticket component (Ajout UI nom agence).
+   - Auth check sur le bouton 'Réserver'.
+   - Fix Reset logic sur `SearchPage.tsx`.
+
+## Fichiers à Investiger :
+- `/src/admin/SuperuserDashboard.tsx` (ou équivalent)
+- `/src/components/Ticket.tsx` (ou équivalent)
+- `/src/pages/BusSearchPage.tsx` (ou `SearchPage.tsx`)
+- `/src/components/BookingForm.tsx` (ou équivalent)
+- `/supabase/schema.sql` (ou inspection via MCP)
+
+🏁 STATUS : EN COURS (Investigation)
