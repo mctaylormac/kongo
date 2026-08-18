@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Bell, Send, Plus, Trash2, Megaphone, Users, Ticket, Globe, Clock, ShieldCheck, Loader2, X } from "../../../lib/icons";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../ui/Card";
-import { useAppState } from "../../context/AppStateContext";
+import { useAppState } from "../../../hooks/useAppState";
 import { supabase } from "../../../lib/supabase";
 import { toast } from "sonner";
 
