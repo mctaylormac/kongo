@@ -88,7 +88,10 @@ export const router = createBrowserRouter([
         path: "reports", 
         element: <RoleGuard allowedRoles={["superuser", "agency", "chef"]}><Reports /></RoleGuard> 
       },
-      { path: "notifications", Component: Notifications },
+      { 
+        path: "notifications", 
+        element: <RoleGuard allowedRoles={["superuser", "agency", "chef"]}><Notifications /></RoleGuard> 
+      },
       { 
         path: "activity-logs", 
         element: <RoleGuard allowedRoles={["superuser"]}><ActivityLogs /></RoleGuard> 

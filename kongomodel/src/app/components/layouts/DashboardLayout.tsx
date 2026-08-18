@@ -25,7 +25,8 @@ import {
   QrCode,
   Scan,
   MessageSquare,
-  Globe
+  Globe,
+  Megaphone
 } from "@/lib/icons";
 import { toast } from "sonner";
 import { useAppState } from "../../../hooks/useAppState";
@@ -192,6 +193,7 @@ export function DashboardLayout() {
          { id: '/finance', label: 'Finance Globale', icon: Wallet },
          { id: '/extra-services', label: 'Services Extras', icon: Zap },
          { id: '/locations-payments', label: 'Pays & Paiements', icon: Globe },
+         { id: '/notifications', label: 'Diffusion Notifications', icon: Megaphone },
          { id: '/scanner', label: 'Scanner QR', icon: QrCode },
          { id: '/chat', label: 'Chat Agences', icon: MessageSquare, badge: chatUnreadCount },
        ];
@@ -207,6 +209,7 @@ export function DashboardLayout() {
          { id: '/bookings', label: 'Tickets', icon: Ticket },
          { id: '/finance', label: 'Finance', icon: Wallet },
          { id: '/cash-management', label: 'Gestion Caisse', icon: BarChart3 },
+         { id: '/notifications', label: 'Notifier Clients 📣', icon: Megaphone },
          { id: '/extra-services', label: 'Services Extras', icon: Zap },
          { id: '/incidents', label: 'Signalements', icon: TriangleAlert },
          { id: '/scanner', label: 'Scanner QR', icon: QrCode },
@@ -218,6 +221,7 @@ export function DashboardLayout() {
          { id: '/trips', label: 'Voyages assignés', icon: Map },
          { id: '/buses', label: 'Mes Bus', icon: Bus },
          { id: '/staff', label: 'Équipe Chauffeurs', icon: Users },
+         { id: '/notifications', label: 'Notifier Clients 📣', icon: Megaphone },
          { id: '/reports', label: 'Rapports', icon: BarChart3 },
          { id: '/incidents', label: 'Signalements', icon: TriangleAlert },
          { id: '/scanner', label: 'Scanner QR', icon: QrCode },
