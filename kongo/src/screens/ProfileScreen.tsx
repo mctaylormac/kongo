@@ -13,6 +13,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
@@ -66,7 +67,7 @@ const MENU_ITEMS: MenuSection[] = [
     { icon: Globe, label: 'Langue', value: 'Français', color: '#444' },
   ]},
   { section: 'Support', items: [
-    { icon: MessageSquare, label: 'Service client', color: '#666' },
+    { icon: MessageSquare, label: 'Service client', value: 'WhatsApp', color: '#25D366' },
     { icon: FileText, label: 'Légal', color: '#666' },
     { icon: Settings, label: 'Version', value: 'v1.0.0', color: '#666' },
   ]},
@@ -418,6 +419,13 @@ export default function ProfileScreen({ navigation }: any) {
                         } else if (item.label === 'Notifications') {
                           setShowNotificationsModal(true);
                           fetchPublishedNotifications();
+                        } else if (item.label === 'Service client') {
+                          const phone = '243819189716';
+                          const message = encodeURIComponent('Bonjour Service Client KonGO, j\'ai une question.');
+                          const whatsappUrl = `https://wa.me/${phone}?text=${message}`;
+                          Linking.openURL(whatsappUrl).catch(() => {
+                            Alert.alert('Erreur', 'Impossible d\'ouvrir WhatsApp. Numéro: +243 819 189 716');
+                          });
                         }
                       }}
                     >
