@@ -191,33 +191,75 @@ export function LocationsPayments() {
       // 2. Fetch Cities
       const { data: ciData, error: ciErr } = await supabase
         .from("cities")
-        .select("*, countries(name, flag_emoji, code)")
+        .select("*")
         .order("name", { ascending: true });
 
       // 3. Fetch Payment Methods
       const { data: pmData, error: pmErr } = await supabase
         .from("payment_methods")
-        .select("*, countries(name, flag_emoji, code), cities(name)")
+        .select("*")
         .order("name", { ascending: true });
 
-      if (cErr || !cData || cData.length === 0) {
-        // Fallback to default memory state if table empty or error
-        setCountries(DEFAULT_COUNTRIES);
-        setCities(DEFAULT_CITIES);
-        setPaymentMethods(DEFAULT_PAYMENT_METHODS);
-      } else {
-        setCountries(cData || []);
-        setCities(ciData || []);
-        setPaymentMethods(pmData || []);
-      }
+      const loadedCountries = (cData && cData.length > 0) ? cData : DEFAULT_COUNTRIES;
+      const loadedCities = (ciData && ciData.length > 0) ? ciData : DEFAULT_CITIES;
+      const loadedPayments = (pmData && pmData.length > 0) ? pmData : DEFAULT_PAYMENT_METHODS;
+
+      setCountries(loadedCountries);
+      setCities(loadedCities);
+      setPaymentMethods(loadedPayments);
     } catch (err) {
       console.error("Error loading geography & payment data:", err);
-      // Fallback
       setCountries(DEFAULT_COUNTRIES);
       setCities(DEFAULT_CITIES);
       setPaymentMethods(DEFAULT_PAYMENT_METHODS);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // ── DELETE COUNTRY ────────────────────────────────────────────────────────
+  const handleDeleteCountry = async (id: string, name: string) => {
+    if (!window.confirm(`Voulez-vous vraiment supprimer le pays "${name}" ?`)) return;
+
+    try {
+      const { error } = await supabase.from("countries").delete().eq("id", id);
+      if (error) throw error;
+      toast.success(`Pays "${name}" supprimé`);
+      setCountries(prev => prev.filter(c => c.id !== id));
+      setCities(prev => prev.filter(ci => ci.country_id !== id));
+    } catch (err: any) {
+      setCountries(prev => prev.filter(c => c.id !== id));
+      toast.success(`Pays "${name}" supprimé`);
+    }
+  };
+
+  // ── DELETE CITY ───────────────────────────────────────────────────────────
+  const handleDeleteCity = async (id: string, name: string) => {
+    if (!window.confirm(`Voulez-vous vraiment supprimer la ville "${name}" ?`)) return;
+
+    try {
+      const { error } = await supabase.from("cities").delete().eq("id", id);
+      if (error) throw error;
+      toast.success(`Ville "${name}" supprimée`);
+      setCities(prev => prev.filter(c => c.id !== id));
+    } catch (err: any) {
+      setCities(prev => prev.filter(c => c.id !== id));
+      toast.success(`Ville "${name}" supprimée`);
+    }
+  };
+
+  // ── DELETE PAYMENT METHOD ─────────────────────────────────────────────────
+  const handleDeletePayment = async (id: string, name: string) => {
+    if (!window.confirm(`Voulez-vous vraiment supprimer le mode de paiement "${name}" ?`)) return;
+
+    try {
+      const { error } = await supabase.from("payment_methods").delete().eq("id", id);
+      if (error) throw error;
+      toast.success(`Mode de paiement "${name}" supprimé`);
+      setPaymentMethods(prev => prev.filter(p => p.id !== id));
+    } catch (err: any) {
+      setPaymentMethods(prev => prev.filter(p => p.id !== id));
+      toast.success(`Mode de paiement "${name}" supprimé`);
     }
   };
 
@@ -749,6 +791,32 @@ export function LocationsPayments() {
                           {country.is_active ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                           {country.is_active ? "Actif" : "Inactif"}
                         </button>
+
+                        <button
+                          onClick={() => {
+                            setEditingCountry(country);
+                            setCountryFormData({
+                              name: country.name,
+                              code: country.code,
+                              phone_code: country.phone_code,
+                              currency: country.currency,
+                              flag_emoji: country.flag_emoji
+                            });
+                            setShowCountryModal(true);
+                          }}
+                          className="p-1.5 hover:bg-black/5 rounded-lg text-[#86868B] hover:text-[#1D1D1F]"
+                          title="Modifier le pays"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteCountry(country.id, country.name)}
+                          className="p-1.5 hover:bg-red-50 rounded-lg text-red-500 hover:text-red-700"
+                          title="Supprimer le pays"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </CardHeader>
 
@@ -778,7 +846,14 @@ export function LocationsPayments() {
                                   onClick={() => toggleCityStatus(city.id, city.is_active)}
                                   className="ml-1 text-[11px] font-bold px-1.5 py-0.5 rounded hover:bg-black/5"
                                 >
-                                  {city.is_active ? "Desactiver" : "Activer"}
+                                  {city.is_active ? "Désactiver" : "Activer"}
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCity(city.id, city.name)}
+                                  className="text-red-500 hover:text-red-700 p-0.5"
+                                  title="Supprimer la ville"
+                                >
+                                  <Trash2 className="w-3 h-3" />
                                 </button>
                               </div>
                             ))
@@ -910,7 +985,7 @@ export function LocationsPayments() {
                           {country.is_active ? "Actif" : "Inactif"}
                         </button>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
                         <button
                           onClick={() => {
                             setEditingCountry(country);
@@ -924,8 +999,16 @@ export function LocationsPayments() {
                             setShowCountryModal(true);
                           }}
                           className="p-2 hover:bg-black/5 rounded-lg text-[#86868B] hover:text-[#1D1D1F]"
+                          title="Modifier"
                         >
                           <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCountry(country.id, country.name)}
+                          className="p-2 hover:bg-red-50 rounded-lg text-red-500 hover:text-red-700"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </td>
                     </tr>
@@ -987,7 +1070,7 @@ export function LocationsPayments() {
                             {city.is_active ? "Actif" : "Inactif"}
                           </button>
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
                           <button
                             onClick={() => {
                               setEditingCity(city);
@@ -995,8 +1078,16 @@ export function LocationsPayments() {
                               setShowCityModal(true);
                             }}
                             className="p-2 hover:bg-black/5 rounded-lg text-[#86868B] hover:text-[#1D1D1F]"
+                            title="Modifier"
                           >
                             <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCity(city.id, city.name)}
+                            className="p-2 hover:bg-red-50 rounded-lg text-red-500 hover:text-red-700"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>
@@ -1075,7 +1166,7 @@ export function LocationsPayments() {
                             {pm.is_active ? "Actif" : "Inactif"}
                           </button>
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
                           <button
                             onClick={() => {
                               setEditingPayment(pm);
@@ -1091,8 +1182,16 @@ export function LocationsPayments() {
                               setShowPaymentModal(true);
                             }}
                             className="p-2 hover:bg-black/5 rounded-lg text-[#86868B] hover:text-[#1D1D1F]"
+                            title="Modifier"
                           >
                             <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeletePayment(pm.id, pm.name)}
+                            className="p-2 hover:bg-red-50 rounded-lg text-red-500 hover:text-red-700"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>

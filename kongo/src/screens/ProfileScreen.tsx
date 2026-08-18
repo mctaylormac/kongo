@@ -27,13 +27,19 @@ import {
   Lock, 
   Settings, 
   ChevronRight,
+  ChevronDown,
   LogOut,
   User as UserIcon,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Edit3,
+  Check,
+  X
 } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
+import { useCountry, Country, DEFAULT_COUNTRIES } from '../context/CountryContext';
+import { PhoneInput } from '../components/PhoneInput';
 
 type MenuItem = {
   icon: any;
@@ -67,11 +73,26 @@ const MENU_ITEMS: MenuSection[] = [
 ];
 
 export default function ProfileScreen({ navigation }: any) {
+  const { selectedCountry, setSelectedCountry, countries } = useCountry();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [notif, setNotif] = useState(true);
   const [bookingCount, setBookingCount] = useState(0);
   const [cityCount, setCityCount] = useState(0);
+
+  // ── Édition du profil ──────────────────────────────────────────────
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [editFullName, setEditFullName] = useState('');
+  const [editCountry, setEditCountry] = useState<Country>(selectedCountry);
+  const [editCity, setEditCity] = useState('');
+  const [editPhoneCode, setEditPhoneCode] = useState(selectedCountry.phone_code || '+243');
+  const [editPhoneNumber, setEditPhoneNumber] = useState('');
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const [loadingCities, setLoadingCities] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [showCountryPickerModal, setShowCountryPickerModal] = useState(false);
+  const [showCityPickerModal, setShowCityPickerModal] = useState(false);
+
   // ── Suppression de compte ──────────────────────────────────────────
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
@@ -80,18 +101,103 @@ export default function ProfileScreen({ navigation }: any) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchUserStats(session.user.id);
+      if (session) {
+        fetchUserStats(session.user.id);
+        populateProfileForm(session.user);
+      }
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) fetchUserStats(session.user.id);
-      else { setBookingCount(0); setCityCount(0); }
+      if (session) {
+        fetchUserStats(session.user.id);
+        populateProfileForm(session.user);
+      } else { 
+        setBookingCount(0); 
+        setCityCount(0); 
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const populateProfileForm = (user: any) => {
+    const meta = user.user_metadata || {};
+    if (meta.full_name) setEditFullName(meta.full_name);
+    if (meta.city) setEditCity(meta.city);
+    if (meta.phone_code) setEditPhoneCode(meta.phone_code);
+    if (meta.phone_number) setEditPhoneNumber(meta.phone_number);
+    if (meta.country_code || meta.country) {
+      const found = countries.find(c => c.code === meta.country_code || c.name === meta.country);
+      if (found) setEditCountry(found);
+    }
+  };
+
+  // Charger les villes selon le pays sélectionné dans le formulaire d'édition
+  useEffect(() => {
+    const fetchCitiesForCountry = async () => {
+      if (!editCountry) return;
+      setLoadingCities(true);
+      try {
+        let query = supabase.from('cities').select('name, country_id').eq('is_active', true);
+        if (editCountry.id) {
+          query = query.eq('country_id', editCountry.id);
+        }
+        const { data, error } = await query;
+        if (!error && data && data.length > 0) {
+          setAvailableCities(data.map((c: any) => c.name));
+        } else {
+          // Fallback par pays
+          if (editCountry.code === 'RDC' || editCountry.phone_code === '+243') {
+            setAvailableCities(['Kinshasa', 'Lubumbashi', 'Goma', 'Bukavu', 'Matadi', 'Kisangani', 'Mbuji-Mayi', 'Kananga']);
+          } else if (editCountry.code === 'CG' || editCountry.phone_code === '+242') {
+            setAvailableCities(['Brazzaville', 'Pointe-Noire', 'Dolisie', 'Nkayi', 'Ouesso']);
+          } else if (editCountry.code === 'CM' || editCountry.phone_code === '+237') {
+            setAvailableCities(['Douala', 'Yaoundé', 'Garoua', 'Bamenda', 'Maroua', 'Bafoussam']);
+          } else if (editCountry.code === 'CI' || editCountry.phone_code === '+225') {
+            setAvailableCities(['Abidjan', 'Bouaké', 'Yamoussoukro', 'San-Pédro', 'Korhogo']);
+          } else {
+            setAvailableCities(['Libreville', 'Port-Gentil', 'Franceville']);
+          }
+        }
+      } catch {
+        setAvailableCities(['Kinshasa', 'Lubumbashi', 'Goma']);
+      } finally {
+        setLoadingCities(false);
+      }
+    };
+    fetchCitiesForCountry();
+  }, [editCountry]);
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      const fullPhone = `${editPhoneCode}${editPhoneNumber.replace(/\s+/g, '')}`;
+      const { data, error } = await supabase.auth.updateUser({
+        data: {
+          full_name: editFullName,
+          country: editCountry.name,
+          country_code: editCountry.code,
+          city: editCity,
+          phone_code: editPhoneCode,
+          phone_number: editPhoneNumber,
+          phone: fullPhone,
+        }
+      });
+
+      if (error) throw error;
+
+      // Mettre à jour le pays sélectionné au niveau global dans l'app
+      setSelectedCountry(editCountry);
+      setShowEditProfileModal(false);
+      Alert.alert('Succès ⚡', 'Votre profil a été mis à jour avec succès.');
+    } catch (err: any) {
+      Alert.alert('Erreur', err.message || 'Impossible de mettre à jour le profil.');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   const fetchUserStats = async (userId: string) => {
     try {
@@ -187,6 +293,15 @@ export default function ProfileScreen({ navigation }: any) {
               <View style={styles.profileBadge}>
                 <Text style={styles.profileBadgeText}>⚡ Voyageur Régulier</Text>
               </View>
+
+              <TouchableOpacity 
+                style={styles.editProfileBtn} 
+                onPress={() => setShowEditProfileModal(true)}
+                activeOpacity={0.8}
+              >
+                <Edit3 size={14} color="#0F172A" style={{ marginRight: 6 }} />
+                <Text style={styles.editProfileBtnText}>Modifier mon profil</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Stats */}
@@ -371,6 +486,177 @@ export default function ProfileScreen({ navigation }: any) {
                 )}
               </TouchableOpacity>
             </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal Édition du Profil ── */}
+      <Modal
+        visible={showEditProfileModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !savingProfile && setShowEditProfileModal(false)}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.editProfileCard}>
+              <View style={styles.editModalHeader}>
+                <Text style={styles.editModalTitle}>Modifier mon profil</Text>
+                <TouchableOpacity 
+                  onPress={() => setShowEditProfileModal(false)}
+                  disabled={savingProfile}
+                  style={styles.closeIconBtn}
+                >
+                  <X size={18} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
+                {/* Nom complet */}
+                <Text style={styles.formFieldLabel}>Nom complet</Text>
+                <TextInput
+                  style={styles.formTextInput}
+                  value={editFullName}
+                  onChangeText={setEditFullName}
+                  placeholder="Votre nom et prénom"
+                  placeholderTextColor="#94A3B8"
+                />
+
+                {/* Pays */}
+                <Text style={styles.formFieldLabel}>Pays de résidence</Text>
+                <TouchableOpacity 
+                  style={styles.selectPickerBtn}
+                  onPress={() => setShowCountryPickerModal(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ fontSize: 18, marginRight: 8 }}>{editCountry.flag_emoji}</Text>
+                  <Text style={styles.selectPickerValue}>{editCountry.name}</Text>
+                  <Text style={styles.selectPickerCode}>{editCountry.code}</Text>
+                  <ChevronDown size={16} color="#64748B" />
+                </TouchableOpacity>
+
+                {/* Ville (filtrée selon le pays) */}
+                <Text style={styles.formFieldLabel}>Ville de résidence</Text>
+                <TouchableOpacity 
+                  style={styles.selectPickerBtn}
+                  onPress={() => setShowCityPickerModal(true)}
+                  activeOpacity={0.7}
+                >
+                  <MapPin size={16} color="#7A960C" style={{ marginRight: 8 }} />
+                  <Text style={[styles.selectPickerValue, !editCity && { color: '#94A3B8' }]}>
+                    {editCity || 'Sélectionner votre ville'}
+                  </Text>
+                  <ChevronDown size={16} color="#64748B" />
+                </TouchableOpacity>
+
+                {/* Numéro de Téléphone avec indicatif séparé */}
+                <PhoneInput
+                  label="Numéro de téléphone"
+                  phoneCode={editPhoneCode}
+                  onPhoneCodeChange={(code, country) => {
+                    setEditPhoneCode(code);
+                    if (country) setEditCountry(country);
+                  }}
+                  phoneNumber={editPhoneNumber}
+                  onPhoneNumberChange={setEditPhoneNumber}
+                  placeholder="812 345 678"
+                />
+              </ScrollView>
+
+              <View style={styles.modalBtns}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => setShowEditProfileModal(false)}
+                  disabled={savingProfile}
+                >
+                  <Text style={styles.modalCancelText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.saveProfileBtn, savingProfile && { opacity: 0.6 }]}
+                  onPress={handleSaveProfile}
+                  disabled={savingProfile}
+                >
+                  {savingProfile ? (
+                    <ActivityIndicator color="#0F172A" size="small" />
+                  ) : (
+                    <Text style={styles.saveProfileText}>Enregistrer</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Sub-modal Choix de Pays ── */}
+      <Modal visible={showCountryPickerModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.editProfileCard, { maxHeight: '60%' }]}>
+            <View style={styles.editModalHeader}>
+              <Text style={styles.editModalTitle}>Sélectionner un Pays</Text>
+              <TouchableOpacity onPress={() => setShowCountryPickerModal(false)} style={styles.closeIconBtn}>
+                <X size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={countries}
+              keyExtractor={item => item.code}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.countryItemRow, editCountry.code === item.code && styles.countryItemSelectedRow]}
+                  onPress={() => {
+                    setEditCountry(item);
+                    setEditPhoneCode(item.phone_code);
+                    setEditCity('');
+                    setShowCountryPickerModal(false);
+                  }}
+                >
+                  <Text style={{ fontSize: 22, marginRight: 10 }}>{item.flag_emoji}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#0F172A' }}>{item.name}</Text>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>Indicatif: {item.phone_code}</Text>
+                  </View>
+                  {editCountry.code === item.code && <Check size={18} color="#7A960C" />}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Sub-modal Choix de Ville ── */}
+      <Modal visible={showCityPickerModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.editProfileCard, { maxHeight: '60%' }]}>
+            <View style={styles.editModalHeader}>
+              <Text style={styles.editModalTitle}>Villes ({editCountry.name})</Text>
+              <TouchableOpacity onPress={() => setShowCityPickerModal(false)} style={styles.closeIconBtn}>
+                <X size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            {loadingCities ? (
+              <ActivityIndicator color="#9EBA15" size="large" style={{ padding: 20 }} />
+            ) : (
+              <FlatList
+                data={availableCities}
+                keyExtractor={item => item}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[styles.countryItemRow, editCity === item && styles.countryItemSelectedRow]}
+                    onPress={() => {
+                      setEditCity(item);
+                      setShowCityPickerModal(false);
+                    }}
+                  >
+                    <MapPin size={16} color="#7A960C" style={{ marginRight: 10 }} />
+                    <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: '#0F172A' }}>{item}</Text>
+                    {editCity === item && <Check size={18} color="#7A960C" />}
+                  </TouchableOpacity>
+                )}
+              />
+            )}
           </View>
         </View>
       </Modal>
@@ -448,4 +734,20 @@ const styles = StyleSheet.create({
   modalNextText: { fontSize: 15, fontWeight: '800', color: '#FFF' },
   modalDeleteBtn: { flex: 1, backgroundColor: '#CC0000', borderRadius: 16, padding: 16, alignItems: 'center' },
   modalDeleteText: { fontSize: 15, fontWeight: '800', color: '#FFF' },
+  // Edit Profile Styles
+  editProfileBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, marginTop: 12, borderWidth: 1, borderColor: '#E2E8F0' },
+  editProfileBtnText: { fontSize: 13, fontWeight: '800', color: '#0F172A' },
+  editProfileCard: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: Platform.OS === 'ios' ? 34 : 24, width: '100%' },
+  editModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
+  editModalTitle: { fontSize: 18, fontWeight: '900', color: '#0F172A' },
+  closeIconBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  formFieldLabel: { fontSize: 11, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
+  formTextInput: { backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 14, paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 12 : 10, fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 14 },
+  selectPickerBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 14 },
+  selectPickerValue: { flex: 1, fontSize: 15, fontWeight: '700', color: '#0F172A' },
+  selectPickerCode: { fontSize: 12, fontWeight: '800', color: '#7A960C', backgroundColor: '#F2F9E8', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginRight: 8 },
+  saveProfileBtn: { flex: 1, backgroundColor: '#C8E63C', borderRadius: 16, padding: 16, alignItems: 'center' },
+  saveProfileText: { fontSize: 15, fontWeight: '900', color: '#0F172A' },
+  countryItemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 12 },
+  countryItemSelectedRow: { backgroundColor: '#F2F9E8' },
 });

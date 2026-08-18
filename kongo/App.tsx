@@ -1,15 +1,17 @@
-// [Agent Dev Mobile] - Action: Point d'entrée de l'application - KonGO User App
 import 'react-native-url-polyfill/auto';
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
+import { CountryProvider } from './src/context/CountryContext';
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
-      <AppNavigator />
+      <CountryProvider>
+        <StatusBar style="light" />
+        <AppNavigator />
+      </CountryProvider>
     </SafeAreaProvider>
   );
 }

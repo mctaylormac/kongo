@@ -15,10 +15,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { User, Phone, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react-native';
-import { supabase } from '../../lib/supabase';
+import { PhoneInput } from '../../components/PhoneInput';
+import { useCountry } from '../../context/CountryContext';
 
 export default function RegisterScreen({ navigation }: any) {
+  const { selectedCountry } = useCountry();
   const [fullName, setFullName] = useState('');
+  const [phoneCode, setPhoneCode] = useState(selectedCountry.phone_code || '+243');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,6 +54,8 @@ export default function RegisterScreen({ navigation }: any) {
 
     setLoading(true);
 
+    const fullPhone = phone.trim() ? `${phoneCode}${phone.trim().replace(/\s+/g, '')}` : null;
+
     // Étape 1 : Créer le compte
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
@@ -58,7 +63,9 @@ export default function RegisterScreen({ navigation }: any) {
       options: {
         data: {
           full_name: fullName.trim(),
+          phone_code: phoneCode,
           phone_number: phone.trim() ? phone.trim() : null,
+          phone: fullPhone,
           role: 'client'
         }
       }
@@ -144,21 +151,14 @@ export default function RegisterScreen({ navigation }: any) {
               </View>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Téléphone <Text style={{ fontWeight: '400', color: '#888' }}>(optionnel)</Text></Text>
-              <View style={styles.inputWrapper}>
-                <Phone size={18} color="#999" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="+243..."
-                  placeholderTextColor="#AAA"
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  editable={!loading}
-                />
-              </View>
-            </View>
+            <PhoneInput
+              label="Téléphone (optionnel)"
+              phoneCode={phoneCode}
+              onPhoneCodeChange={(code) => setPhoneCode(code)}
+              phoneNumber={phone}
+              onPhoneNumberChange={setPhone}
+              placeholder="812 345 678"
+            />
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>

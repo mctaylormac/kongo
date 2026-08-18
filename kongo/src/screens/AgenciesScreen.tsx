@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import AgencyReviewsModal from '../components/AgencyReviewsModal';
 
+import { useCountry } from '../context/CountryContext';
+
 function AgencyCard({
   agency,
   navigation,
@@ -51,7 +53,7 @@ function AgencyCard({
       </View>
 
       <Text style={styles.description}>
-        {agency.address || `Agence de transport basée à Kinshasa. Qualité et confort garantis.`}
+        {agency.address || `Agence de transport partenaire KonGO. Qualité et confort garantis.`}
       </Text>
 
       <View style={styles.footer}>
@@ -77,6 +79,7 @@ function AgencyCard({
 }
 
 export default function AgenciesScreen({ navigation }: any) {
+  const { selectedCountry } = useCountry();
   const [agencies, setAgencies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -93,15 +96,26 @@ export default function AgenciesScreen({ navigation }: any) {
   useEffect(() => {
     const fetchAgencies = async () => {
       setLoading(true);
-      const { data, error } = await supabase.from('agencies').select('*').order('name');
-      if (!error && data) setAgencies(data);
-      setLoading(false);
+      try {
+        let queryDB = supabase.from('agencies').select('*');
+        if (selectedCountry?.name) {
+          // Filtrer si colonne country disponible ou garder toutes si colonne nulle
+          queryDB = queryDB.or(`country.eq.${selectedCountry.name},country.is.null,country.eq.${selectedCountry.code}`);
+        }
+        const { data, error } = await queryDB.order('name');
+        if (!error && data) setAgencies(data);
+      } catch (err) {
+        console.error('Erreur chargement agences:', err);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchAgencies();
-  }, []);
+  }, [selectedCountry]);
 
   const filtered = agencies.filter(a =>
-    a.name.toLowerCase().includes(query.toLowerCase())
+    a.name.toLowerCase().includes(query.toLowerCase()) ||
+    (a.address && a.address.toLowerCase().includes(query.toLowerCase()))
   );
 
   return (
@@ -111,7 +125,9 @@ export default function AgenciesScreen({ navigation }: any) {
       <View style={styles.topBar}>
         <View>
           <Text style={styles.pageTitle}>Nos Agences</Text>
-          <Text style={styles.pageSubtitle}>{filtered.length} partenaires</Text>
+          <Text style={styles.pageSubtitle}>
+            {selectedCountry.flag_emoji} {selectedCountry.name} ({filtered.length} partenaires)
+          </Text>
         </View>
       </View>
 

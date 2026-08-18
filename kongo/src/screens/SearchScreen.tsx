@@ -13,17 +13,45 @@ import {
   Dimensions,
   ActivityIndicator,
   Platform,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { MapPin, Flag, Calendar, Users } from 'lucide-react-native';
+import { MapPin, Flag, Calendar, Users, Search, X, Bus } from 'lucide-react-native';
+import { useCountry } from '../context/CountryContext';
 
 const { width } = Dimensions.get('window');
 
-const FALLBACK_CITIES = [
-  'Kinshasa', 'Lubumbashi', 'Mbuji-Mayi', 'Goma', 'Bukavu', 'Kisangani',
-  'Kananga', 'Matadi', 'Likasi', 'Kolwezi', 'Uvira', 'Bunia'
+export interface SearchLocationItem {
+  id?: string;
+  name: string;
+  cityName?: string;
+  type: 'city' | 'stop';
+}
+
+const FALLBACK_LOCATIONS: SearchLocationItem[] = [
+  { name: 'Kinshasa', type: 'city' },
+  { name: 'Lubumbashi', type: 'city' },
+  { name: 'Goma', type: 'city' },
+  { name: 'Bukavu', type: 'city' },
+  { name: 'Matadi', type: 'city' },
+  { name: 'Kisangani', type: 'city' },
+  { name: 'Mbuji-Mayi', type: 'city' },
+  { name: 'Kananga', type: 'city' },
+  { name: 'Kolwezi', type: 'city' },
+  { name: 'Likasi', type: 'city' },
+  { name: 'Uvira', type: 'city' },
+  { name: 'Bunia', type: 'city' },
+  { id: 'stop-kin-1', name: 'Gare Centrale (Kinshasa)', cityName: 'Kinshasa', type: 'stop' },
+  { id: 'stop-kin-2', name: 'Station Masina (Kinshasa)', cityName: 'Kinshasa', type: 'stop' },
+  { id: 'stop-kin-3', name: 'Agence Ndjili (Kinshasa)', cityName: 'Kinshasa', type: 'stop' },
+  { id: 'stop-lub-1', name: 'Gare Routière Lubumbashi', cityName: 'Lubumbashi', type: 'stop' },
+  { id: 'stop-lub-2', name: 'Terminal Centre-Ville (Lubumbashi)', cityName: 'Lubumbashi', type: 'stop' },
+  { id: 'stop-gom-1', name: 'Virunga Terminal (Goma)', cityName: 'Goma', type: 'stop' },
+  { id: 'stop-mat-1', name: 'Port & Gare de Matadi', cityName: 'Matadi', type: 'stop' },
 ];
 
 const STEPS = ['Recherche', 'Résultats', 'Sièges', 'Paiement', 'Billet'];
@@ -31,7 +59,7 @@ const STEPS = ['Recherche', 'Résultats', 'Sièges', 'Paiement', 'Billet'];
 const InputField = ({ label, value, onPress, icon: Icon, highlight }: any) => (
   <TouchableOpacity onPress={onPress} style={[styles.inputField, highlight && styles.inputFieldHighlight]} activeOpacity={0.75}>
     <View style={styles.inputIconContainer}>
-      <Icon size={20} color="#9EBA15" />
+      <Icon size={20} color="#7A960C" />
     </View>
     <View style={{ flex: 1 }}>
       <Text style={styles.inputLabel}>{label}</Text>
@@ -44,58 +72,122 @@ const InputField = ({ label, value, onPress, icon: Icon, highlight }: any) => (
 );
 
 export default function SearchScreen({ navigation }: any) {
+  const { selectedCountry } = useCountry();
   const [from, setFrom] = useState('');
+  const [fromStopId, setFromStopId] = useState<string | null>(null);
   const [to, setTo] = useState('');
+  const [toStopId, setToStopId] = useState<string | null>(null);
   const [dateLabel, setDateLabel] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [passengers, setPassengers] = useState(1);
   const [modal, setModal] = useState<'from' | 'to' | 'date' | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [cityQuery, setCityQuery] = useState('');
-  const [cities, setCities] = useState<string[]>(FALLBACK_CITIES);
-  const [loadingCities, setLoadingCities] = useState(false);
+  const [locationTab, setLocationTab] = useState<'all' | 'city' | 'stop'>('all');
+  const [locations, setLocations] = useState<SearchLocationItem[]>(FALLBACK_LOCATIONS);
+  const [loadingLocations, setLoadingLocations] = useState(false);
 
   useEffect(() => {
-    const fetchCities = async () => {
-      setLoadingCities(true);
+    const fetchLocations = async () => {
+      setLoadingLocations(true);
       try {
-        // 1. Charger d'abord les villes actives depuis la table 'cities' de Supabase
-        const { data: cData, error: cErr } = await supabase
-          .from('cities')
-          .select('name')
-          .eq('is_active', true)
-          .order('name', { ascending: true });
+        let cityItems: SearchLocationItem[] = [];
+        let stopItems: SearchLocationItem[] = [];
+
+        // 1. Charger les villes du pays sélectionné
+        let cityQueryDB = supabase.from('cities').select('name, country_id').eq('is_active', true);
+        if (selectedCountry?.id) {
+          cityQueryDB = cityQueryDB.eq('country_id', selectedCountry.id);
+        }
+        const { data: cData, error: cErr } = await cityQueryDB.order('name', { ascending: true });
 
         if (!cErr && cData && cData.length > 0) {
-          setCities([...new Set(cData.map((l: any) => l.name))]);
-          return;
+          cityItems = cData.map((l: any) => ({ name: l.name, type: 'city' }));
+        } else {
+          const { data: locData } = await supabase
+            .from('locations')
+            .select('name')
+            .order('name', { ascending: true });
+
+          if (locData && locData.length > 0) {
+            cityItems = locData.map((l: any) => ({ name: l.name, type: 'city' }));
+          }
         }
 
-        // 2. Fallback table 'locations'
-        const { data, error } = await supabase
-          .from('locations')
-          .select('name')
+        // 2. Charger les arrêts
+        const { data: stopsData } = await supabase
+          .from('stops')
+          .select('id, name, city_name')
           .order('name', { ascending: true });
 
-        if (!error && data && data.length > 0) {
-          setCities([...new Set(data.map((l: any) => l.name))]);
+        if (stopsData && stopsData.length > 0) {
+          stopItems = stopsData.map((s: any) => ({
+            id: s.id,
+            name: s.city_name ? `${s.name} (${s.city_name})` : s.name,
+            cityName: s.city_name,
+            type: 'stop',
+          }));
         }
+
+        let fallbackFiltered = FALLBACK_LOCATIONS;
+        if (selectedCountry?.code === 'CG' || selectedCountry?.phone_code === '+242') {
+          fallbackFiltered = [
+            { name: 'Brazzaville', type: 'city' },
+            { name: 'Pointe-Noire', type: 'city' },
+            { name: 'Dolisie', type: 'city' },
+            { id: 'stop-cg-1', name: 'Gare Routière Brazzaville', cityName: 'Brazzaville', type: 'stop' },
+            { id: 'stop-cg-2', name: 'Port de Pointe-Noire', cityName: 'Pointe-Noire', type: 'stop' },
+          ];
+        } else if (selectedCountry?.code === 'CM' || selectedCountry?.phone_code === '+237') {
+          fallbackFiltered = [
+            { name: 'Douala', type: 'city' },
+            { name: 'Yaoundé', type: 'city' },
+            { name: 'Garoua', type: 'city' },
+            { id: 'stop-cm-1', name: 'Gare Voyageurs Yaoundé', cityName: 'Yaoundé', type: 'stop' },
+            { id: 'stop-cm-2', name: 'Agence Akwa (Douala)', cityName: 'Douala', type: 'stop' },
+          ];
+        } else if (selectedCountry?.code === 'CI' || selectedCountry?.phone_code === '+225') {
+          fallbackFiltered = [
+            { name: 'Abidjan', type: 'city' },
+            { name: 'Bouaké', type: 'city' },
+            { name: 'Yamoussoukro', type: 'city' },
+            { id: 'stop-ci-1', name: 'Gare Adjamé (Abidjan)', cityName: 'Abidjan', type: 'stop' },
+          ];
+        }
+
+        const combined = [
+          ...(cityItems.length > 0 ? cityItems : fallbackFiltered.filter(x => x.type === 'city')),
+          ...(stopItems.length > 0 ? stopItems : fallbackFiltered.filter(x => x.type === 'stop')),
+        ];
+
+        setLocations(combined);
       } catch {
-        // keep fallback
+        setLocations(FALLBACK_LOCATIONS);
       } finally {
-        setLoadingCities(false);
+        setLoadingLocations(false);
       }
     };
-    fetchCities();
-  }, []);
+    fetchLocations();
+  }, [selectedCountry]);
 
-  const filteredCities = cities.filter(c => c.toLowerCase().includes(cityQuery.toLowerCase()));
+  const filteredLocations = locations.filter(loc => {
+    const matchesTab = locationTab === 'all' || loc.type === locationTab;
+    const matchesQuery = loc.name.toLowerCase().includes(cityQuery.toLowerCase()) ||
+                         (loc.cityName && loc.cityName.toLowerCase().includes(cityQuery.toLowerCase()));
+    return matchesTab && matchesQuery;
+  });
 
   const canSearch = from && to && from !== to;
 
-  const selectCity = (city: string) => {
-    if (modal === 'from') setFrom(city);
-    if (modal === 'to') setTo(city);
+  const selectLocationItem = (item: SearchLocationItem) => {
+    if (modal === 'from') {
+      setFrom(item.name);
+      setFromStopId(item.type === 'stop' ? item.id || item.name : null);
+    }
+    if (modal === 'to') {
+      setTo(item.name);
+      setToStopId(item.type === 'stop' ? item.id || item.name : null);
+    }
     setModal(null);
     setCityQuery('');
   };
@@ -105,6 +197,8 @@ export default function SearchScreen({ navigation }: any) {
     navigation.navigate('Results', { 
       from, 
       to, 
+      fromStopId,
+      toStopId,
       dateLabel: dateLabel || "Aujourd'hui", 
       selectedDate: selectedDate || new Date().toISOString().split('T')[0],
       passengers 
@@ -212,74 +306,163 @@ export default function SearchScreen({ navigation }: any) {
       </ScrollView>
 
       {/* Picker Modal (City & Date) */}
-      <Modal visible={modal !== null} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>
-              {modal === 'from' ? 'Ville de départ' : modal === 'to' ? 'Ville d\'arrivée' : 'Choisir la date'}
-            </Text>
-            
-            {(modal === 'from' || modal === 'to') ? (
-              <>
-                <TextInput
-                  style={styles.modalSearch}
-                  placeholder="Rechercher une ville..."
-                  placeholderTextColor="#666"
-                  value={cityQuery}
-                  onChangeText={setCityQuery}
-                  autoFocus
-                />
-                {loadingCities ? (
-                  <View style={{ paddingVertical: 30, alignItems: 'center' }}>
-                    <ActivityIndicator color="#C8E63C" />
-                    <Text style={{ marginTop: 8, color: '#999', fontSize: 12 }}>Chargement des villes...</Text>
+      <Modal 
+        visible={modal !== null} 
+        animationType="slide" 
+        transparent
+        onRequestClose={() => { setModal(null); setCityQuery(''); }}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.modalKeyboardAvoiding}
+            >
+              <View style={styles.modalSheet}>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalHandle} />
+                  <View style={styles.modalTitleRow}>
+                    <Text style={styles.modalTitle}>
+                      {modal === 'from' ? 'Départ' : modal === 'to' ? 'Arrivée' : 'Choisir la date'}
+                    </Text>
+                    <TouchableOpacity 
+                      style={styles.modalCloseIconBtn} 
+                      onPress={() => { setModal(null); setCityQuery(''); }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <X size={18} color="#64748B" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {(modal === 'from' || modal === 'to') ? (
+                  <View style={styles.modalBody}>
+                    {/* Search box */}
+                    <View style={styles.searchBoxContainer}>
+                      <Search size={18} color="#94A3B8" style={{ marginRight: 10 }} />
+                      <TextInput
+                        style={styles.modalSearchInput}
+                        placeholder="Rechercher une ville, un arrêt, une gare..."
+                        placeholderTextColor="#94A3B8"
+                        value={cityQuery}
+                        onChangeText={setCityQuery}
+                        autoFocus
+                        returnKeyType="search"
+                        clearButtonMode="while-editing"
+                      />
+                    </View>
+
+                    {/* Filter Tabs: Toutes / Villes / Arrêts */}
+                    <View style={styles.tabFilterRow}>
+                      <TouchableOpacity 
+                        style={[styles.tabFilterPill, locationTab === 'all' && styles.tabFilterPillActive]} 
+                        onPress={() => setLocationTab('all')}
+                      >
+                        <Text style={[styles.tabFilterText, locationTab === 'all' && styles.tabFilterTextActive]}>Toutes</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.tabFilterPill, locationTab === 'city' && styles.tabFilterPillActive]} 
+                        onPress={() => setLocationTab('city')}
+                      >
+                        <MapPin size={12} color={locationTab === 'city' ? '#0F172A' : '#64748B'} style={{ marginRight: 4 }} />
+                        <Text style={[styles.tabFilterText, locationTab === 'city' && styles.tabFilterTextActive]}>Villes</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.tabFilterPill, locationTab === 'stop' && styles.tabFilterPillActive]} 
+                        onPress={() => setLocationTab('stop')}
+                      >
+                        <Bus size={12} color={locationTab === 'stop' ? '#0F172A' : '#64748B'} style={{ marginRight: 4 }} />
+                        <Text style={[styles.tabFilterText, locationTab === 'stop' && styles.tabFilterTextActive]}>Arrêts & Gares</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {loadingLocations ? (
+                      <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+                        <ActivityIndicator color="#9EBA15" size="large" />
+                        <Text style={{ marginTop: 10, color: '#64748B', fontSize: 13, fontWeight: '500' }}>Chargement des lieux...</Text>
+                      </View>
+                    ) : (
+                      <FlatList
+                        data={filteredLocations}
+                        keyExtractor={(item, index) => item.id || item.name + index}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={{ paddingBottom: 20 }}
+                        renderItem={({ item }) => {
+                          const isSelected = (modal === 'from' && from === item.name) || (modal === 'to' && to === item.name);
+                          const isStop = item.type === 'stop';
+                          return (
+                            <TouchableOpacity 
+                              style={[styles.cityItem, isSelected && styles.cityItemSelected]} 
+                              onPress={() => selectLocationItem(item)}
+                              activeOpacity={0.7}
+                            >
+                              <View style={[
+                                styles.cityIconBadge, 
+                                isStop && styles.stopIconBadge,
+                                isSelected && styles.cityIconBadgeSelected
+                              ]}>
+                                {isStop ? (
+                                  <Bus size={17} color={isSelected ? '#FFFFFF' : '#2563EB'} />
+                                ) : (
+                                  <MapPin size={17} color={isSelected ? '#FFFFFF' : '#7A960C'} />
+                                )}
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={[styles.cityItemText, isSelected && styles.cityItemTextSelected]}>{item.name}</Text>
+                                <Text style={styles.citySubText}>
+                                  {isStop ? `Arrêt / Gare • ${item.cityName || 'Réseau KonGO'}` : 'Ville principale'}
+                                </Text>
+                              </View>
+                              {isSelected && <Text style={styles.cityCheckmark}>✓</Text>}
+                            </TouchableOpacity>
+                          );
+                        }}
+                        ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: '#F1F5F9' }} />}
+                        ListEmptyComponent={
+                          <View style={{ padding: 24, alignItems: 'center' }}>
+                            <Text style={{ color: '#94A3B8', fontSize: 14, textAlign: 'center', fontWeight: '500' }}>
+                              Aucun lieu trouvé pour "{cityQuery}"
+                            </Text>
+                          </View>
+                        }
+                      />
+                    )}
                   </View>
                 ) : (
-                  <FlatList
-                    data={filteredCities}
-                    keyExtractor={c => c}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity style={styles.cityItem} onPress={() => selectCity(item)}>
-                        <MapPin size={18} color="#9EBA15" style={{ marginRight: 12 }} />
-                        <Text style={styles.cityItemText}>{item}</Text>
-                      </TouchableOpacity>
-                    )}
-                    ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: '#EEE' }} />}
-                    ListEmptyComponent={<Text style={{ color: '#AAA', padding: 16, textAlign: 'center' }}>Aucune ville trouvée</Text>}
-                  />
+                  <View style={styles.modalBody}>
+                    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                      {[0, 1, 2, 3, 4, 5, 6, 7].map(offset => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + offset);
+                        const label = offset === 0 ? "Aujourd'hui" : offset === 1 ? "Demain" : d.toLocaleDateString('fr-CD', { weekday: 'long', day: 'numeric', month: 'long' });
+                        const dateValue = d.toISOString().split('T')[0];
+                        const isSelected = selectedDate === dateValue;
+                        return (
+                          <TouchableOpacity 
+                            key={dateValue} 
+                            style={[styles.cityItem, isSelected && styles.cityItemSelected]} 
+                            onPress={() => { 
+                              setDateLabel(label); 
+                              setSelectedDate(dateValue);
+                              setModal(null); 
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.cityIconBadge, isSelected && styles.cityIconBadgeSelected]}>
+                              <Calendar size={18} color={isSelected ? '#FFFFFF' : '#7A960C'} />
+                            </View>
+                            <Text style={[styles.cityItemText, isSelected && styles.cityItemTextSelected]}>{label}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
                 )}
-              </>
-            ) : (
-              <ScrollView>
-                {[0, 1, 2, 3, 4, 5, 6, 7].map(offset => {
-                  const d = new Date();
-                  d.setDate(d.getDate() + offset);
-                  const label = offset === 0 ? "Aujourd'hui" : offset === 1 ? "Demain" : d.toLocaleDateString('fr-CD', { weekday: 'long', day: 'numeric', month: 'long' });
-                  const dateValue = d.toISOString().split('T')[0];
-                  return (
-                    <TouchableOpacity 
-                      key={dateValue} 
-                      style={styles.cityItem} 
-                      onPress={() => { 
-                        setDateLabel(label); 
-                        setSelectedDate(dateValue);
-                        setModal(null); 
-                      }}
-                    >
-                      <Calendar size={18} color="#9EBA15" style={{ marginRight: 12 }} />
-                      <Text style={styles.cityItemText}>{label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            )}
-            
-            <TouchableOpacity style={styles.modalClose} onPress={() => { setModal(null); setCityQuery(''); }}>
-              <Text style={styles.modalCloseText}>Fermer</Text>
-            </TouchableOpacity>
+              </View>
+            </KeyboardAvoidingView>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Selecteur de Date Natif (Mobile) */}
@@ -344,14 +527,14 @@ const styles = StyleSheet.create({
   stepLabelActive: { color: '#9EBA15' },
   screenTitle: { fontSize: 24, color: '#0A0A0A', fontWeight: '900', marginBottom: 4 },
   screenSubtitle: { fontSize: 13, color: '#666', marginBottom: 24, fontWeight: '500' },
-  card: { backgroundColor: '#F9F9F9', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#EEE' },
-  inputField: { flexDirection: 'row', alignItems: 'center', padding: 18 },
-  inputFieldHighlight: { backgroundColor: '#F0F9E6' },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 20, overflow: 'hidden', borderWidth: 1.5, borderColor: '#E2E8F0', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
+  inputField: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#FFFFFF' },
+  inputFieldHighlight: { backgroundColor: '#FAFCF5' },
   inputIcon: { fontSize: 18, marginRight: 14 },
-  inputIconContainer: { marginRight: 14, width: 24, alignItems: 'center', justifyContent: 'center' },
-  inputLabel: { fontSize: 10, color: '#666', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  inputValue: { fontSize: 15, color: '#0A0A0A', fontWeight: '700', marginTop: 2 },
-  inputPlaceholder: { color: '#AAA' },
+  inputIconContainer: { marginRight: 14, width: 38, height: 38, borderRadius: 19, backgroundColor: '#F2F9E8', alignItems: 'center', justifyContent: 'center' },
+  inputLabel: { fontSize: 10, color: '#64748B', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
+  inputValue: { fontSize: 15, color: '#0F172A', fontWeight: '700', marginTop: 2 },
+  inputPlaceholder: { color: '#2D3748', fontWeight: '600' },
   inputChevron: { fontSize: 22, color: '#9EBA15' },
   swapContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18 },
   divider: { flex: 1, height: 1, backgroundColor: '#EEE' },
@@ -369,14 +552,29 @@ const styles = StyleSheet.create({
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   quickBadge: { backgroundColor: '#FFF', borderRadius: 20, paddingVertical: 10, paddingHorizontal: 16, borderWidth: 1, borderColor: '#EEE' },
   quickBadgeText: { fontSize: 12, color: '#9EBA15', fontWeight: '700' },
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '75%' },
-  modalHandle: { width: 40, height: 4, backgroundColor: '#DDD', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 18, color: '#0A0A0A', fontWeight: '900', marginBottom: 16 },
-  modalSearch: { backgroundColor: '#F5F5F5', borderRadius: 12, padding: 14, color: '#0A0A0A', fontSize: 14, marginBottom: 12, borderWidth: 1, borderColor: '#EEE' },
-  cityItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 12 },
-  cityItemIcon: { fontSize: 16 },
-  cityItemText: { fontSize: 15, color: '#0A0A0A', fontWeight: '600' },
-  modalClose: { marginTop: 16, backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, alignItems: 'center' },
-  modalCloseText: { color: '#666', fontWeight: '700', fontSize: 14 },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15, 23, 42, 0.5)' },
+  modalKeyboardAvoiding: { width: '100%', maxHeight: '90%', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 20, width: '100%', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 12 },
+  modalHeader: { alignItems: 'center', marginBottom: 12 },
+  modalHandle: { width: 38, height: 4, backgroundColor: '#CBD5E1', borderRadius: 2, marginBottom: 14 },
+  modalTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4 },
+  modalTitle: { fontSize: 18, color: '#0F172A', fontWeight: '900' },
+  modalCloseIconBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  modalBody: { flexShrink: 1, maxHeight: 420 },
+  searchBoxContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 14, borderWidth: 1.5, borderColor: '#E2E8F0', paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 12 : 6, marginBottom: 14 },
+  modalSearchInput: { flex: 1, fontSize: 15, color: '#0F172A', fontWeight: '600' },
+  tabFilterRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  tabFilterPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20, backgroundColor: '#F1F5F9' },
+  tabFilterPillActive: { backgroundColor: '#C8E63C' },
+  tabFilterText: { fontSize: 12, color: '#64748B', fontWeight: '700' },
+  tabFilterTextActive: { color: '#0F172A', fontWeight: '800' },
+  cityItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12 },
+  cityItemSelected: { backgroundColor: '#F2F9E8' },
+  cityIconBadge: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  stopIconBadge: { backgroundColor: '#EFF6FF' },
+  cityIconBadgeSelected: { backgroundColor: '#9EBA15' },
+  cityItemText: { fontSize: 15, color: '#334155', fontWeight: '600' },
+  cityItemTextSelected: { color: '#0F172A', fontWeight: '800' },
+  citySubText: { fontSize: 11, color: '#94A3B8', marginTop: 2, fontWeight: '500' },
+  cityCheckmark: { fontSize: 16, color: '#7A960C', fontWeight: '800', marginLeft: 8 },
 });
