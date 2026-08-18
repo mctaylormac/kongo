@@ -1,4 +1,4 @@
-﻿-- ============================================================
+-- ============================================================
 -- Migration: Vue popular_routes — Trajets les plus réservés
 -- ============================================================
 -- Calcule les 5 paires (départ, destination) ayant le plus
@@ -20,7 +20,7 @@ JOIN public.locations loc_origin
   ON loc_origin.id = t.origin_location_id
 JOIN public.locations loc_dest
   ON loc_dest.id = t.destination_location_id
-WHERE b.status IN (''confirmed'', ''completed'', ''pending'')
+WHERE b.status IN ('confirmed', 'completed', 'pending')
 GROUP BY loc_origin.name, loc_dest.name, t.duration
 ORDER BY booking_count DESC
 LIMIT 5;
