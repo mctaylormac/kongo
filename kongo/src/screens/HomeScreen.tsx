@@ -13,22 +13,21 @@ import {
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { 
+  Search, 
+  Bus, 
+  Building2, 
+  Ticket, 
+  Star, 
+  ArrowRight, 
+  ChevronRight, 
+  Sparkles, 
+  MapPin, 
+  Compass 
+} from 'lucide-react-native';
+import { supabase } from '../lib/supabase';
 
 const { width } = Dimensions.get('window');
-
-const AGENCIES = [
-  { id: 1, name: 'Agence A', logo: require('../../assets/logo1.png'), rating: 4.8, trips: 120 },
-  { id: 2, name: 'Agence B', logo: require('../../assets/logo2.png'), rating: 4.6, trips: 85 },
-  { id: 3, name: 'Agence C', logo: require('../../assets/logo3.png'), rating: 4.9, trips: 210 },
-];
-
-const POPULAR_ROUTES = [
-  { from: 'Kinshasa', to: 'Lubumbashi', price: '150.000 CDF', duration: '30h' },
-  { from: 'Kinshasa', to: 'Mbuji-Mayi', price: '80.000 CDF', duration: '18h' },
-  { from: 'Goma', to: 'Bukavu', price: '25.000 CDF', duration: '3h' },
-];
-
-import { supabase } from '../lib/supabase';
 
 // ─── Slides promotionnels KINTU ───
 const KINTU_SLIDES = [
@@ -63,7 +62,7 @@ const KINTU_SLIDES = [
   {
     id: 'more',
     title: 'Et tant d\'autres...',
-    subtitle: 'Hôtels, restos, sites, loisirs \u2014 tout est sur KINTU',
+    subtitle: 'Hôtels, restos, sites, loisirs — tout est sur KINTU',
     image: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=600&q=80',
     gradient: '#2d1b69',
   },
@@ -111,7 +110,6 @@ export default function HomeScreen({ navigation }: any) {
         useNativeDriver: true,
       }).start();
     });
-    // Restart interval
     slideInterval.current = setInterval(() => {
       Animated.timing(fadeAnim, {
         toValue: 0,
@@ -130,7 +128,6 @@ export default function HomeScreen({ navigation }: any) {
 
   React.useEffect(() => {
     async function fetchAgencies() {
-      // Try trusted agencies first, fall back to all agencies
       const { data: trusted } = await supabase
         .from('agencies')
         .select('id, name, logo_url, rating')
@@ -140,7 +137,6 @@ export default function HomeScreen({ navigation }: any) {
       if (trusted && trusted.length > 0) {
         setAgencies(trusted);
       } else {
-        // Fallback: show any active agencies
         const { data: all } = await supabase
           .from('agencies')
           .select('id, name, logo_url, rating')
@@ -167,22 +163,47 @@ export default function HomeScreen({ navigation }: any) {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Bienvenue 👋</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.greeting}>Bienvenue</Text>
+              <Sparkles size={16} color="#7A960C" />
+            </View>
             <Text style={styles.tagline}>Où allez-vous aujourd'hui ?</Text>
           </View>
           <Image source={require('../../assets/ICONE.png')} style={styles.headerLogo} resizeMode="contain" />
         </View>
 
-        {/* Hero Search CTA */}
-        <TouchableOpacity style={styles.heroCTA} onPress={() => navigation.navigate('Search')} activeOpacity={0.85}>
-          <View style={styles.heroCTAInner}>
-            <Text style={styles.heroCTALabel}>🔍 Rechercher un trajet</Text>
-            <Text style={styles.heroCTASubLabel}>De • Vers • Date • Passagers</Text>
-          </View>
-          <View style={styles.heroCTAArrow}>
-            <Text style={styles.heroCTAArrowText}>→</Text>
-          </View>
-        </TouchableOpacity>
+        {/* ── Actions Rapides 2-par-2 (Grid de 2) ── */}
+        <View style={styles.quickActionsGrid}>
+          <TouchableOpacity 
+            style={styles.quickActionCardPrimary} 
+            onPress={() => navigation.navigate('Search')} 
+            activeOpacity={0.85}
+          >
+            <View style={styles.quickActionHeader}>
+              <View style={styles.quickActionIconBoxPrimary}>
+                <Search size={20} color="#0F172A" />
+              </View>
+              <ArrowRight size={18} color="#0F172A" />
+            </View>
+            <Text style={styles.quickActionTitlePrimary}>Rechercher un trajet</Text>
+            <Text style={styles.quickActionSubPrimary}>De • Vers • Date • Billets</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.quickActionCardSecondary} 
+            onPress={() => navigation.navigate('Agencies')} 
+            activeOpacity={0.85}
+          >
+            <View style={styles.quickActionHeader}>
+              <View style={styles.quickActionIconBoxSecondary}>
+                <Building2 size={20} color="#7A960C" />
+              </View>
+              <ChevronRight size={18} color="#94A3B8" />
+            </View>
+            <Text style={styles.quickActionTitleSecondary}>Nos Agences</Text>
+            <Text style={styles.quickActionSubSecondary}>Partenaires vérifiés</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Trajets populaires */}
         <View style={styles.section}>
@@ -197,7 +218,7 @@ export default function HomeScreen({ navigation }: any) {
               >
                 <View style={styles.routeCardHeader}>
                   <Text style={styles.routeFrom}>{route.from}</Text>
-                  <Text style={styles.routeArrow}>→</Text>
+                  <ArrowRight size={14} color="#7A960C" style={{ marginHorizontal: 4 }} />
                   <Text style={styles.routeTo}>{route.to}</Text>
                 </View>
                 <View style={styles.routeCardFooter}>
@@ -228,9 +249,13 @@ export default function HomeScreen({ navigation }: any) {
               </View>
               <View style={{ flex: 1, marginLeft: 14 }}>
                 <Text style={styles.agencyName}>{agency.name}</Text>
-                <Text style={styles.agencyMeta}>⭐ {agency.rating || '0.0'}  ·  En ligne</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                  <Star size={12} color="#EAB308" fill="#EAB308" />
+                  <Text style={styles.agencyRatingText}>{agency.rating || '4.8'}</Text>
+                  <Text style={styles.agencyMeta}>· En ligne</Text>
+                </View>
               </View>
-              <Text style={styles.agencyChevron}>›</Text>
+              <ChevronRight size={18} color="#CBD5E1" />
             </TouchableOpacity>
           )) : (
             <View style={{ paddingVertical: 20, paddingRight: 24 }}>
@@ -244,7 +269,10 @@ export default function HomeScreen({ navigation }: any) {
         {/* Promo Banner */}
         <View style={styles.promoBanner}>
           <View style={styles.promoBannerContent}>
-            <Text style={styles.promoTitle}>🎫 Première réservation</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <Ticket size={18} color="#7A960C" />
+              <Text style={styles.promoTitle}>Première réservation</Text>
+            </View>
             <Text style={styles.promoSubtitle}>Profitez d'une réduction sur votre 1ère réservation via l'app KonGO.</Text>
             <TouchableOpacity style={styles.promoBtn} onPress={() => navigation.navigate('Search')}>
               <Text style={styles.promoBtnText}>Réserver maintenant</Text>
@@ -305,21 +333,94 @@ export default function HomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  greeting: { fontSize: 13, color: '#666', fontWeight: '600', letterSpacing: 0.5 },
+  greeting: { fontSize: 13, color: '#666', fontWeight: '700', letterSpacing: 0.5 },
   tagline: { fontSize: 22, color: '#0A0A0A', fontWeight: '900', marginTop: 2 },
   headerLogo: { width: 42, height: 42 },
-  heroCTA: {
-    marginHorizontal: 24, marginTop: 16, marginBottom: 8,
-    backgroundColor: '#C8E63C', borderRadius: 18, padding: 18,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    elevation: 4, shadowColor: '#9EBA15', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 6
+
+  // ── Grid 2-par-2 Actions Rapides ──
+  quickActionsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 24,
+    marginTop: 16,
+    marginBottom: 8,
   },
-  heroCTAInner: { flex: 1 },
-  heroCTALabel: { fontSize: 16, fontWeight: '900', color: '#0A0A0A' },
-  heroCTASubLabel: { fontSize: 11, color: '#3a4a00', marginTop: 3, fontWeight: '600' },
-  heroCTAArrow: { width: 36, height: 36, backgroundColor: '#0A0A0A', borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  heroCTAArrowText: { color: '#C8E63C', fontSize: 18, fontWeight: '800' },
-  section: { marginTop: 28, paddingLeft: 24 },
+  quickActionCardPrimary: {
+    flex: 1,
+    backgroundColor: '#C8E63C',
+    borderRadius: 20,
+    padding: 16,
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    minHeight: 116,
+    elevation: 3,
+    shadowColor: '#9EBA15',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+  },
+  quickActionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  quickActionIconBoxPrimary: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickActionTitlePrimary: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  quickActionSubPrimary: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  quickActionCardSecondary: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    minHeight: 116,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+  },
+  quickActionIconBoxSecondary: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#F2F9E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickActionTitleSecondary: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  quickActionSubSecondary: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+
+  section: { marginTop: 24, paddingLeft: 24 },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 24, marginBottom: 14 },
   sectionTitle: { fontSize: 18, color: '#0A0A0A', fontWeight: '900', letterSpacing: 0.3 },
   seeAll: { fontSize: 12, color: '#9EBA15', fontWeight: '800' },
@@ -327,9 +428,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9F9F9', borderRadius: 16, padding: 16, width: width * 0.55,
     borderWidth: 1, borderColor: '#EEE',
   },
-  routeCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  routeCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   routeFrom: { fontSize: 13, color: '#0A0A0A', fontWeight: '800', flex: 1 },
-  routeArrow: { fontSize: 13, color: '#9EBA15', fontWeight: '800' },
   routeTo: { fontSize: 13, color: '#9EBA15', fontWeight: '800', flex: 1, textAlign: 'right' },
   routeCardFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
   routePrice: { fontSize: 15, color: '#0A0A0A', fontWeight: '900' },
@@ -342,15 +442,15 @@ const styles = StyleSheet.create({
   agencyLogoBox: { width: 52, height: 52, backgroundColor: '#F9F9F9', borderRadius: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: '#EEE' },
   agencyLogo: { width: 44, height: 44 },
   agencyName: { fontSize: 15, color: '#0A0A0A', fontWeight: '800' },
-  agencyMeta: { fontSize: 12, color: '#666', marginTop: 3, fontWeight: '600' },
-  agencyChevron: { fontSize: 22, color: '#9EBA15', fontWeight: '300' },
+  agencyRatingText: { fontSize: 12, color: '#0F172A', fontWeight: '800' },
+  agencyMeta: { fontSize: 12, color: '#666', fontWeight: '600' },
   promoBanner: {
     marginHorizontal: 24, marginTop: 28, backgroundColor: '#F5FCC5',
     borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center',
     borderWidth: 1, borderColor: '#E6EDA3',
   },
   promoBannerContent: { flex: 1 },
-  promoTitle: { fontSize: 16, color: '#6A7D0A', fontWeight: '900', marginBottom: 6 },
+  promoTitle: { fontSize: 16, color: '#6A7D0A', fontWeight: '900' },
   promoSubtitle: { fontSize: 12, color: '#666', lineHeight: 17, marginBottom: 14, fontWeight: '500' },
   promoBtn: { backgroundColor: '#0A0A0A', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16, alignSelf: 'flex-start' },
   promoBtnText: { fontSize: 12, color: '#C8E63C', fontWeight: '900' },
@@ -364,7 +464,7 @@ const styles = StyleSheet.create({
   },
   kintuHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justify.content: 'space-between',
     alignItems: 'center',
     marginBottom: 14,
   },
