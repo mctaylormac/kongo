@@ -97,7 +97,8 @@ import {
   Scan,
   WifiOff,
   Flag,
-  OctagonX
+  OctagonX,
+  Megaphone
 } from "lucide-react";
 
 export const CATEGORY_ICONS: Record<string, any> = {
@@ -206,5 +207,6 @@ export {
   Scan,
   WifiOff,
   Flag,
-  OctagonX
+  OctagonX,
+  Megaphone
 };
