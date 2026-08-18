@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   Switch,
   StatusBar,
   ActivityIndicator,
@@ -14,6 +13,9 @@ import {
   TextInput,
   Alert,
   Linking,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
@@ -224,7 +226,7 @@ export default function ProfileScreen({ navigation }: any) {
     setSavingProfile(true);
     try {
       const fullPhone = `${editPhoneCode}${editPhoneNumber.replace(/\s+/g, '')}`;
-      const { data, error } = await supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         data: {
           full_name: editFullName,
           country: editCountry.name,
@@ -716,6 +718,10 @@ export default function ProfileScreen({ navigation }: any) {
                 )}
               />
             )}
+          </View>
+        </View>
+      </Modal>
+
       {/* ── Modal Liste des Notifications ── */}
       <Modal
         visible={showNotificationsModal}
