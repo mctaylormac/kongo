@@ -98,7 +98,8 @@ import {
   WifiOff,
   Flag,
   OctagonX,
-  Megaphone
+  Megaphone,
+  Send
 } from "lucide-react";
 
 export const CATEGORY_ICONS: Record<string, any> = {
@@ -208,5 +209,6 @@ export {
   WifiOff,
   Flag,
   OctagonX,
-  Megaphone
+  Megaphone,
+  Send
 };
