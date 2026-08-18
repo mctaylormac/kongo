@@ -4,23 +4,22 @@
     "slug": "KongoChauffeur",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/ICONE.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/logo3.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#C8E63C"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "package": "com.kongo.chauffeur",
+      "icon": "./assets/ICONE.png",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/ICONE.png",
+        "backgroundColor": "#000000"
       },
       "predictiveBackGestureEnabled": false
     },

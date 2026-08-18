@@ -1,0 +1,50 @@
+[
+  {
+    "id": "TASK-001",
+    "title": "Audit responsive design for Mobile First parity",
+    "description": "Review key components (NewBooking, Buses, Trips) to ensure they follow the 'Mobile First' requirement from REFERENCE_BACKOFFICE.md.",
+    "priority": "high",
+    "status": "pending",
+    "tags": ["ui", "audit"]
+  },
+  {
+    "id": "TASK-002",
+    "title": "Implement Baggage Weight Logic in NewBooking",
+    "description": "Add logic to calculate baggage prices based on kg and configured thresholds as per Section 2.66 of REFERENCE_BACKOFFICE.md.",
+    "priority": "high",
+    "status": "pending",
+    "tags": ["feature", "booking"]
+  },
+  {
+    "id": "TASK-003",
+    "title": "Develop Cashier Dashboard (Dashboard Caisse)",
+    "description": "Create a dedicated dashboard for cashiers to track current session revenue (entrées/sorties).",
+    "priority": "medium",
+    "status": "pending",
+    "tags": ["feature", "cashier"]
+  },
+  {
+    "id": "TASK-004",
+    "title": "Implement Incident Reporting (Signalements)",
+    "description": "Add functionality for Chefs to report incidents and bus technical issues (Section 1.C.34).",
+    "priority": "medium",
+    "status": "pending",
+    "tags": ["feature", "logistics"]
+  },
+  {
+    "id": "TASK-005",
+    "title": "Consolidated Financial Reporting for Superusers",
+    "description": "Implement global revenue and commission reporting for the Superuser role.",
+    "priority": "medium",
+    "status": "pending",
+    "tags": ["feature", "finance", "superuser"]
+  },
+  {
+    "id": "TASK-006",
+    "title": "Integrate Supabase Real-time for Sales",
+    "description": "Ensure booking views and dashboards update in real-time when new tickets are sold.",
+    "priority": "low",
+    "status": "pending",
+    "tags": ["technical", "real-time"]
+  }
+]

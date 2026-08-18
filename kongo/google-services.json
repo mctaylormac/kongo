@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "742743875539",
+    "project_id": "kongo-8161f",
+    "storage_bucket": "kongo-8161f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:742743875539:android:12c0b9b09007dee3515926",
+        "android_client_info": {
+          "package_name": "com.mactaylor.kongo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAiqHiipBssgnvoNvjchUyBkk6LKT1FHA0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -37,7 +37,7 @@ export interface Seat {
 
 export interface BaggageItem {
   id: string;
-  type: 'cabine' | 'soute';
+  type: 'cabine' | 'soute' | 'extra';
   weight: number;
   price: number;
   description: string;
@@ -79,6 +79,55 @@ export interface FavoriteRoute {
   addedDate: string;
 }
 
+export interface AuthCredentials {
+  email: string;
+  password: string;
+  rememberMe: boolean;
+}
+
+export interface SignupData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  dateOfBirth: string;
+  city: string;
+  password: string;
+  acceptTerms: boolean;
+  marketing: boolean;
+}
+
+export type SocialProvider = 'google' | 'facebook' | 'microsoft';
+
+export interface BookingPaymentData {
+  method: string;
+}
+
+export interface UserProfile {
+  role?: string | null;
+  full_name?: string | null;
+  agency_id?: string | null;
+}
+
+export type UserRole =
+  | 'guest'
+  | 'user'
+  | 'superuser'
+  | 'agency'
+  | 'chef'
+  | 'driver'
+  | 'cashier';
+
+export const ADMIN_ROLES: UserRole[] = ['superuser', 'agency', 'chef', 'driver', 'cashier'];
+
+export function normalizeUserRole(role?: string | null): UserRole {
+  if (!role) return 'user';
+  if (role === 'client') return 'user';
+  if ((ADMIN_ROLES as string[]).includes(role)) return role as UserRole;
+  if (role === 'user') return 'user';
+  return 'user';
+}
+
 export interface BreadcrumbItem {
   id: string;
   label: string;
@@ -86,9 +135,24 @@ export interface BreadcrumbItem {
   current?: boolean;
 }
 
+export interface StoredAppState {
+  searchParams?: SearchParams | null;
+  selectedTrip?: Trip | null;
+  selectedSeats?: Seat[];
+  baggageData?: BaggageData | null;
+  bookingData?: BookingData | null;
+  paymentStatus?: AppState['paymentStatus'];
+  bookingHistory?: BookingData[];
+  favoriteRoutes?: FavoriteRoute[];
+  userPreferences?: Partial<UserPreferences>;
+  sessionTimestamp?: number;
+  currentPage?: string | null;
+}
+
 export interface AppState {
   currentPage: string;
-  userRole: 'guest' | 'superuser' | 'agency' | 'chef' | 'driver' | 'cashier';
+  userRole: UserRole;
+  isAuthenticated: boolean;
   isLoading: boolean;
   canGoBack: boolean;
   searchParams: SearchParams | null;
@@ -106,12 +170,13 @@ export interface AppState {
   setSelectedTrip: (trip: Trip | null) => void;
   setSelectedSeats: (seats: Seat[]) => void;
   setBaggageData: (baggage: BaggageData | null) => void;
-  completeBooking: (paymentData: any) => void;
+  completeBooking: (booking: BookingData) => void;
   resetBookingFlow: () => void;
   recoverSession: () => void;
   getSessionAge: () => number;
   addToFavorites: (route: { from: string; to: string }) => void;
   updatePreferences: (preferences: Partial<UserPreferences>) => void;
   clearHistory: () => void;
-  setUserRole: (role: 'guest' | 'superuser' | 'agency' | 'chef' | 'driver' | 'cashier') => void;
+  setUserRole: (role: UserRole) => void;
+  setIsAuthenticated: (value: boolean) => void;
 }

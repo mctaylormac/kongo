@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
 import {
   X, Star, Shield, Phone, Globe, Mail, MapPin, Calendar,
   Users, Award, CheckCircle, Clock, Navigation,
@@ -8,7 +10,8 @@ import {
   Share2, Bookmark, Eye, Activity, TrendingUp, Heart,
   CreditCard, Bus, Gauge, Trophy, Target, BadgeCheck,
   Route, FileText, AlertCircle, Camera, Play, Pause,
-  ZoomIn, Maximize2, Grid3X3, Filter, Tag, Image as ImageIcon
+  ZoomIn, Maximize2, Grid3X3, Filter, Tag, Image as ImageIcon,
+  Pencil, Trash2
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Badge } from './ui/badge';
@@ -53,7 +56,6 @@ interface AgencyDetailsProps {
 const getEnrichedAgencyData = (agency: Agency) => {
   const baseData = {
     ...agency,
-    // Photos haute qualité de l'agence avec métadonnées enrichies
     photos: [
       {
         url: 'https://images.unsplash.com/photo-1570125909517-53cb21c89ff2?w=1200&auto=format&fit=crop&q=80',
@@ -113,7 +115,6 @@ const getEnrichedAgencyData = (agency: Agency) => {
       }
     ],
 
-    // Horaires d'ouverture détaillés
     businessHours: {
       'Lundi - Vendredi': '5:30 - 21:00',
       'Samedi': '6:00 - 20:00',
@@ -121,7 +122,6 @@ const getEnrichedAgencyData = (agency: Agency) => {
       'Jours fériés': '8:00 - 18:00'
     },
 
-    // Avis clients récents avec plus de détails
     recentReviews: [
       {
         id: 1,
@@ -137,7 +137,7 @@ const getEnrichedAgencyData = (agency: Agency) => {
         id: 2,
         name: 'Jean Kabasubabu',
         rating: 4,
-        comment: 'Très satisfait de mon voyage. Personnel accueillant et serviable. Seul petit bémol : départ avec 20 minutes de retard, mais arrivée à l\'heure prévue grâce à la conduite professionnelle. Recommande sans hésiter.',
+        comment: 'Très satisfait de mon voyage. Personnel accueillant et serviable. Seul petit bémol : départ avec 20 minutes de retard, mais arrivée à l\'heure prévue grâce à la conduite professionnelle.',
         date: '2024-01-12',
         verified: true,
         route: 'Goma → Kinshasa',
@@ -147,7 +147,7 @@ const getEnrichedAgencyData = (agency: Agency) => {
         id: 3,
         name: 'Claudine Tshisekedi',
         rating: 5,
-        comment: 'Transport premium comme promis ! Sièges inclinables, collations incluses, et même un système de divertissement à bord. Le GPS tracking permet aux familles de suivre le voyage en temps réel. Innovation remarquable !',
+        comment: 'Transport premium comme promis ! Sièges inclinables, collations incluses, et même un système de divertissement à bord. Le GPS tracking permet aux familles de suivre le voyage en temps réel.',
         date: '2024-01-10',
         verified: true,
         route: 'Lubumbashi → Bukavu',
@@ -165,7 +165,6 @@ const getEnrichedAgencyData = (agency: Agency) => {
       }
     ],
 
-    // Statistiques détaillées et métriques de performance
     performanceMetrics: {
       monthlyTrips: Math.max(45, Math.floor(agency.totalTrips / 12)),
       avgResponseTime: agency.tier === 'platinum' ? '8 min' : agency.tier === 'gold' ? '12 min' : '18 min',
@@ -177,7 +176,6 @@ const getEnrichedAgencyData = (agency: Agency) => {
       modernFleetPercentage: agency.tier === 'platinum' ? 95 : agency.tier === 'gold' ? 85 : 70
     },
 
-    // Services et équipements avancés
     premiumServices: [
       {
         icon: Wifi,
@@ -229,7 +227,6 @@ const getEnrichedAgencyData = (agency: Agency) => {
       }
     ],
 
-    // Routes populaires avec détails
     popularRoutes: agency.operatingRoutes.slice(0, 6).map(route => {
       const [from, to] = route.split('-');
       return {
@@ -243,14 +240,12 @@ const getEnrichedAgencyData = (agency: Agency) => {
       };
     }),
 
-    // Certifications et accréditations
     certifications: [
       ...agency.certifications,
       ...(agency.tier === 'platinum' ? ['ISO 9001:2015', 'Transport Excellence Award 2023'] : []),
       ...(agency.tier === 'gold' ? ['Service Quality Certification'] : [])
     ],
 
-    // Informations de contact étendues
     contactInfo: {
       ...agency,
       address: `Avenue de la Révolution, Quartier Commercial, ${agency.headquarters}, République Démocratique du Congo`,
@@ -263,7 +258,6 @@ const getEnrichedAgencyData = (agency: Agency) => {
       }
     },
 
-    // Indicateurs de performance avancés
     kpiMetrics: {
       safetyScore: Math.min(100, agency.safetyRating * 20),
       environmentScore: agency.tier === 'platinum' ? 92 : agency.tier === 'gold' ? 78 : 65,
@@ -329,19 +323,107 @@ export function AgencyDetails({ agency, isOpen, onClose }: AgencyDetailsProps) {
   const [selectedPhotoCategory, setSelectedPhotoCategory] = useState<string>('all');
   const [isZoomed, setIsZoomed] = useState(false);
 
+  // ── Gestion dynamique des avis & de la note ──────────────────────────────
+  const [reviewsList, setReviewsList] = useState<any[]>([]);
+  const [avgRating, setAvgRating] = useState<number>(agency?.rating || 4.8);
+  const [totalReviewsCount, setTotalReviewsCount] = useState<number>(0);
+  const [loadingReviews, setLoadingReviews] = useState<boolean>(true);
+
+  // ── Utilisateur connecté ──────────────────────────────────────────────────
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Formulaire d'ajout d'un avis
+  const [showAddReviewForm, setShowAddReviewForm] = useState<boolean>(false);
+  const [newAuthorName, setNewAuthorName] = useState<string>("");
+  const [newRating, setNewRating] = useState<number>(5);
+  const [hoverRating, setHoverRating] = useState<number>(0);
+  const [newComment, setNewComment] = useState<string>("");
+  const [newRoute, setNewRoute] = useState<string>("Kinshasa → Lubumbashi");
+  const [newTripType, setNewTripType] = useState<string>("VIP");
+  const [submittingReview, setSubmittingReview] = useState<boolean>(false);
+
+  // ── Édition / Suppression d'un avis existant ─────────────────────────────
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [editRating, setEditRating] = useState<number>(5);
+  const [editHoverRating, setEditHoverRating] = useState<number>(0);
+  const [editComment, setEditComment] = useState<string>("");
+  const [editRoute, setEditRoute] = useState<string>("");
+  const [editTripType, setEditTripType] = useState<string>("VIP");
+  const [savingEdit, setSavingEdit] = useState<boolean>(false);
+  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+
+  // ── enrichedAgency est calculé ici (avant le early return) ───────────────
+  // On le mémoïse pour avoir une référence stable
+  const enrichedAgency = React.useMemo(
+    () => (agency ? getEnrichedAgencyData(agency) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [agency?.id]
+  );
+
+  // ── Chargement des avis depuis Supabase ─────────────────────────────────
+  const fetchReviews = useCallback(async () => {
+    if (!agency?.id || !enrichedAgency) return;
+    setLoadingReviews(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (profile?.full_name) {
+          setNewAuthorName(profile.full_name);
+        } else if (user.email) {
+          setNewAuthorName(user.email.split('@')[0]);
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('agency_reviews')
+        .select('*')
+        .eq('agency_id', agency.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setReviewsList(data);
+        const sum = data.reduce((acc: number, curr: any) => acc + (Number(curr.rating) || 5), 0);
+        const avg = (sum / data.length).toFixed(1);
+        setAvgRating(parseFloat(avg));
+        setTotalReviewsCount(data.length);
+      } else {
+        setReviewsList(enrichedAgency.recentReviews);
+        setAvgRating(agency.rating || 4.8);
+        setTotalReviewsCount(enrichedAgency.recentReviews.length);
+      }
+    } catch (err) {
+      console.error("Error fetching agency reviews:", err);
+      if (enrichedAgency) {
+        setReviewsList(enrichedAgency.recentReviews);
+        setAvgRating(agency.rating || 4.8);
+        setTotalReviewsCount(enrichedAgency.recentReviews.length);
+      }
+    } finally {
+      setLoadingReviews(false);
+    }
+  // enrichedAgency est stable grâce au useMemo ci-dessus
+  }, [agency?.id, agency?.rating, enrichedAgency]);
+
   useEffect(() => {
     if (isOpen && agency) {
-      // Simuler le comptage des vues avec progression réaliste
+      fetchReviews();
+
       setViewCount(prev => prev + 1);
 
-      // Vérifier si l'agence est dans les favoris
       const savedBookmarks = localStorage.getItem('kongo-bookmarked-agencies');
       if (savedBookmarks) {
         const bookmarks = JSON.parse(savedBookmarks);
         setIsBookmarked(bookmarks.includes(agency.id));
       }
 
-      // Auto-rotation des photos avec nombre correct
       const interval = setInterval(() => {
         if (!isPlaying) {
           setActivePhotoIndex(prev => (prev + 1) % 8);
@@ -350,11 +432,138 @@ export function AgencyDetails({ agency, isOpen, onClose }: AgencyDetailsProps) {
 
       return () => clearInterval(interval);
     }
-  }, [isOpen, agency, isPlaying]);
+  }, [isOpen, agency, isPlaying, fetchReviews]);
 
-  if (!agency) return null;
+  // ── Basculer le formulaire d'avis avec vérification d'authentification ────
+  const handleToggleAddReview = () => {
+    if (!currentUser) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session?.user) {
+          toast.error("Connexion requise : Veuillez vous connecter à votre compte pour laisser une note et un avis.");
+        } else {
+          setCurrentUser(session.user);
+          setShowAddReviewForm(prev => !prev);
+        }
+      });
+      return;
+    }
+    setShowAddReviewForm(prev => !prev);
+  };
 
-  const enrichedAgency = getEnrichedAgencyData(agency);
+  // ── Soumission d'un nouvel avis (Strictement authentifié) ─────────────────
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Vous devez être connecté à votre compte pour publier un avis.");
+      return;
+    }
+    if (!newAuthorName.trim() || !newComment.trim()) {
+      toast.error("Veuillez renseigner votre commentaire.");
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      const { error } = await supabase.from('agency_reviews').insert({
+        agency_id: agency.id,
+        user_id: user.id,
+        author_name: newAuthorName.trim(),
+        rating: newRating,
+        comment: newComment.trim(),
+        route: newRoute || "Kinshasa → Lubumbashi",
+        trip_type: newTripType || "VIP",
+        verified: true,
+      });
+
+      if (error) throw error;
+
+      toast.success("Votre avis a été publié avec succès ! Merci pour votre évaluation.");
+      setNewComment("");
+      setShowAddReviewForm(false);
+      await fetchReviews();
+    } catch (err: any) {
+      toast.error("Erreur lors de la publication de l'avis : " + err.message);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  // ── Ouvrir le formulaire d'édition d'un avis ─────────────────────────────
+  const handleEditReview = (review: any) => {
+    setEditingReviewId(review.id);
+    setEditRating(Number(review.rating) || 5);
+    setEditComment(review.comment || "");
+    setEditRoute(review.route || "");
+    setEditTripType(review.trip_type || "VIP");
+    setShowAddReviewForm(false); // ferme le formulaire d'ajout si ouvert
+  };
+
+  // ── Sauvegarder les modifications d'un avis ──────────────────────────────
+  const handleUpdateReview = async (e: React.FormEvent, reviewId: string) => {
+    e.preventDefault();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Vous devez être connecté pour modifier un avis.");
+      return;
+    }
+    if (!editComment.trim()) {
+      toast.error("Le commentaire ne peut pas être vide.");
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase
+        .from('agency_reviews')
+        .update({
+          rating: editRating,
+          comment: editComment.trim(),
+          route: editRoute || "Kinshasa → Lubumbashi",
+          trip_type: editTripType || "VIP",
+        })
+        .eq('id', reviewId)
+        .eq('user_id', user.id); // sécurité : seul l'auteur peut modifier
+
+      if (error) throw error;
+
+      toast.success("Votre avis a été mis à jour avec succès !");
+      setEditingReviewId(null);
+      await fetchReviews();
+    } catch (err: any) {
+      toast.error("Erreur lors de la mise à jour : " + err.message);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // ── Supprimer un avis ────────────────────────────────────────────────────
+  const handleDeleteReview = async (reviewId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Vous devez être connecté pour supprimer un avis.");
+      return;
+    }
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer votre avis ? Cette action est irréversible.")) return;
+    setDeletingReviewId(reviewId);
+    try {
+      const { error } = await supabase
+        .from('agency_reviews')
+        .delete()
+        .eq('id', reviewId)
+        .eq('user_id', user.id); // sécurité : seul l'auteur peut supprimer
+
+      if (error) throw error;
+
+      toast.success("Votre avis a été supprimé.");
+      await fetchReviews();
+    } catch (err: any) {
+      toast.error("Erreur lors de la suppression : " + err.message);
+    } finally {
+      setDeletingReviewId(null);
+    }
+  };
+
+  // ── Early return APRÈS tous les hooks (règle des hooks React) ────────────
+  if (!agency || !enrichedAgency) return null;
 
   const handleContactAction = (type: 'phone' | 'email' | 'website' | 'whatsapp') => {
     switch (type) {
@@ -373,71 +582,6 @@ export function AgencyDetails({ agency, isOpen, onClose }: AgencyDetailsProps) {
     }
   };
 
-  const handleBookingAction = () => {
-    // Déclencher l'événement de recherche avec cette agence
-    const searchEvent = new CustomEvent('agency-booking', {
-      detail: {
-        agencyId: agency.id,
-        agencyName: agency.name,
-        routes: agency.operatingRoutes
-      }
-    });
-    window.dispatchEvent(searchEvent);
-    onClose();
-  };
-
-  const handleBookmarkToggle = () => {
-    const savedBookmarks = localStorage.getItem('kongo-bookmarked-agencies');
-    let bookmarks = savedBookmarks ? JSON.parse(savedBookmarks) : [];
-
-    if (isBookmarked) {
-      bookmarks = bookmarks.filter((id: string) => id !== agency.id);
-    } else {
-      bookmarks.push(agency.id);
-    }
-
-    localStorage.setItem('kongo-bookmarked-agencies', JSON.stringify(bookmarks));
-    setIsBookmarked(!isBookmarked);
-  };
-
-  const handleShareAgency = async () => {
-    const shareData = {
-      title: `${agency.name} - Transport Premium RDC | KonGO`,
-      text: `Découvrez ${agency.name}, agence de transport ${agency.tier} avec ${agency.rating}⭐ de satisfaction client`,
-      url: `${window.location.origin}/?agency=${agency.id}`
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (error) {
-        navigator.clipboard.writeText(shareData.url);
-      }
-    } else {
-      navigator.clipboard.writeText(shareData.url);
-    }
-  };
-
-  const nextPhoto = () => {
-    setIsPlaying(true);
-    setActivePhotoIndex((prev) =>
-      prev === enrichedAgency.photos.length - 1 ? 0 : prev + 1
-    );
-    setTimeout(() => setIsPlaying(false), 1000);
-  };
-
-  const prevPhoto = () => {
-    setIsPlaying(true);
-    setActivePhotoIndex((prev) =>
-      prev === 0 ? enrichedAgency.photos.length - 1 : prev - 1
-    );
-    setTimeout(() => setIsPlaying(false), 1000);
-  };
-
-  const filteredPhotos = enrichedAgency.photos.filter(photo =>
-    selectedPhotoCategory === 'all' || photo.category === selectedPhotoCategory
-  );
-
   return (
     <TooltipProvider>
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -452,11 +596,9 @@ export function AgencyDetails({ agency, isOpen, onClose }: AgencyDetailsProps) {
           </DialogHeader>
 
           <div className="relative">
-            {/* Header avec photos et superposition professionnelle */}
             <div className={`relative h-96 bg-gradient-to-br ${getTierGradient(agency.tier)} overflow-hidden`}>
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40"></div>
 
-              {/* Carousel de photos amélioré */}
               <div className="relative h-full group">
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -476,487 +618,106 @@ export function AgencyDetails({ agency, isOpen, onClose }: AgencyDetailsProps) {
                   </motion.div>
                 </AnimatePresence>
 
-                {/* Contrôles de navigation améliorés */}
-                <Button
-                  onClick={prevPhoto}
-                  variant="ghost"
-                  size="icon"
-                  className="absolute left-6 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-sm border border-white/20"
-                  aria-label="Photo précédente"
-                >
-                  <ChevronLeft className="h-6 w-6" />
-                </Button>
-
-                <Button
-                  onClick={nextPhoto}
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-6 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-sm border border-white/20"
-                  aria-label="Photo suivante"
-                >
-                  <ChevronRight className="h-6 w-6" />
-                </Button>
-
-                {/* Indicateurs de photos professionnels */}
-                <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-2">
-                  {enrichedAgency.photos.map((_, index) => (
-                    <Tooltip key={index}>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => setActivePhotoIndex(index)}
-                          className={`w-3 h-3 rounded-full transition-all duration-300 hover:scale-125 ${index === activePhotoIndex
-                            ? 'bg-kongo-lime shadow-kongo-lime ring-2 ring-kongo-lime/50'
-                            : 'bg-white/60 hover:bg-white/80 backdrop-blur-sm'
-                            }`}
-                          aria-label={`Photo ${index + 1}`}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent className="bg-kongo-black text-on-black">
-                        {enrichedAgency.photos[index].title}
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
+                <div className="absolute top-6 right-6 z-20">
+                  <Button
+                    onClick={onClose}
+                    variant="ghost"
+                    size="icon"
+                    className="bg-black/30 hover:bg-[#FF3B30] text-white transition-all duration-300 backdrop-blur-sm border border-white/20"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
                 </div>
 
-                {/* Lecture automatique toggle et contrôles galerie */}
-                <div className="absolute bottom-8 right-8 flex space-x-3">
-                  {/* Vue galerie toggle */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        onClick={() => setIsGalleryView(!isGalleryView)}
-                        variant="ghost"
-                        size="icon"
-                        className={`backdrop-blur-sm border border-white/20 transition-all duration-300 ${isGalleryView
-                          ? 'bg-kongo-lime text-on-lime hover:bg-kongo-lime-hover'
-                          : 'bg-black/40 hover:bg-black/60 text-white'
-                          }`}
-                      >
-                        <Grid3X3 className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="bg-kongo-black text-on-black">
-                      {isGalleryView ? 'Vue carrousel' : 'Vue galerie'}
-                    </TooltipContent>
-                  </Tooltip>
-
-                  {/* Plein écran */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        onClick={() => setIsFullscreen(true)}
-                        variant="ghost"
-                        size="icon"
-                        className="bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm border border-white/20"
-                      >
-                        <Maximize2 className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="bg-kongo-black text-on-black">
-                      Plein écran
-                    </TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        onClick={() => setIsPlaying(!isPlaying)}
-                        variant="ghost"
-                        size="icon"
-                        className="bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm border border-white/20"
-                      >
-                        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="bg-kongo-black text-on-black">
-                      {isPlaying ? 'Pause auto' : 'Lecture auto'}
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-
-                {/* Métadonnées de la photo active */}
-                <motion.div
-                  className="absolute bottom-20 left-8 right-8 opacity-0 group-hover:opacity-100 transition-all duration-300"
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <div className="bg-black/60 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="text-h6 text-white font-semibold mb-1">
-                          {enrichedAgency.photos[activePhotoIndex].title}
-                        </h3>
-                        <p className="text-body-small text-gray-200 leading-relaxed">
-                          {enrichedAgency.photos[activePhotoIndex].description}
-                        </p>
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/75 to-transparent p-8 backdrop-blur-sm">
+                  <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between space-y-6 xl:space-y-0">
+                    <div className="flex items-start space-x-6">
+                      <div className="text-6xl lg:text-7xl filter drop-shadow-2xl">
+                        {agency.logo}
                       </div>
-                      <Badge
-                        className={`ml-4 flex-shrink-0 ${enrichedAgency.photos[activePhotoIndex].featured
-                          ? 'bg-kongo-lime text-on-lime'
-                          : 'bg-white/20 text-white'
-                          }`}
-                      >
-                        <Tag className="w-3 h-3 mr-1" />
-                        {enrichedAgency.photos[activePhotoIndex].category}
-                      </Badge>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Vue galerie overlay */}
-                <AnimatePresence>
-                  {isGalleryView && (
-                    <motion.div
-                      className="absolute inset-0 bg-black/90 backdrop-blur-md z-10 p-8"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div className="h-full flex flex-col">
-                        {/* Header galerie */}
-                        <div className="flex items-center justify-between mb-6">
-                          <div className="flex items-center space-x-4">
-                            <Button
-                              onClick={() => setIsGalleryView(false)}
-                              variant="ghost"
-                              size="icon"
-                              className="bg-white/10 hover:bg-white/20 text-white"
-                            >
-                              <X className="h-5 w-5" />
-                            </Button>
-                            <div>
-                              <h3 className="text-h5 text-white font-semibold">
-                                Galerie photos - {agency.name}
-                              </h3>
-                              <p className="text-body-small text-gray-300">
-                                {enrichedAgency.photos.length} photos disponibles
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Filtres par catégorie */}
-                          <div className="flex items-center space-x-2">
-                            <Filter className="w-4 h-4 text-gray-300" />
-                            <select
-                              value={selectedPhotoCategory}
-                              onChange={(e) => setSelectedPhotoCategory(e.target.value)}
-                              className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm backdrop-blur-sm"
-                            >
-                              <option value="all">Toutes les photos</option>
-                              <option value="fleet">Flotte</option>
-                              <option value="interior">Intérieur</option>
-                              <option value="station">Gare</option>
-                              <option value="staff">Équipe</option>
-                              <option value="service">Services</option>
-                              <option value="scenery">Paysages</option>
-                              <option value="maintenance">Maintenance</option>
-                              <option value="vip">VIP</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Grille de photos */}
-                        <ScrollArea className="flex-1">
-                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {filteredPhotos.map((photo, index) => (
-                              <motion.div
-                                key={index}
-                                className="relative group cursor-pointer"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.1 }}
-                                onClick={() => {
-                                  setActivePhotoIndex(enrichedAgency.photos.findIndex(p => p.url === photo.url));
-                                  setIsGalleryView(false);
-                                }}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                              >
-                                <div className="aspect-video rounded-lg overflow-hidden bg-gray-800">
-                                  <img
-                                    src={photo.url}
-                                    alt={photo.title}
-                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                                  />
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                                  {/* Overlay d'informations */}
-                                  <div className="absolute bottom-0 left-0 right-0 p-3 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                                    <h4 className="text-white font-medium text-sm truncate">
-                                      {photo.title}
-                                    </h4>
-                                    <div className="flex items-center justify-between mt-1">
-                                      <Badge
-                                        className={`text-xs ${photo.featured
-                                          ? 'bg-kongo-lime text-on-lime'
-                                          : 'bg-white/20 text-white'
-                                          }`}
-                                      >
-                                        {photo.category}
-                                      </Badge>
-                                      {photo.featured && (
-                                        <Star className="w-3 h-3 text-kongo-lime fill-current" />
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </motion.div>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Fullscreen overlay */}
-                <AnimatePresence>
-                  {isFullscreen && (
-                    <motion.div
-                      className="fixed inset-0 bg-black z-50 flex items-center justify-center"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      onClick={() => setIsFullscreen(false)}
-                    >
-                      <div className="relative max-w-7xl max-h-full p-8">
-                        <img
-                          src={enrichedAgency.photos[activePhotoIndex].url}
-                          alt={enrichedAgency.photos[activePhotoIndex].title}
-                          className="max-w-full max-h-full object-contain"
-                        />
-                        <Button
-                          onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsFullscreen(false); }}
-                          variant="ghost"
-                          size="icon"
-                          className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <X className="h-5 w-5" />
-                        </Button>
-
-                        {/* Navigation en plein écran */}
-                        <Button
-                          onClick={(e: React.MouseEvent) => { e.stopPropagation(); prevPhoto(); }}
-                          variant="ghost"
-                          size="icon"
-                          className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <ChevronLeft className="h-6 w-6" />
-                        </Button>
-
-                        <Button
-                          onClick={(e: React.MouseEvent) => { e.stopPropagation(); nextPhoto(); }}
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <ChevronRight className="h-6 w-6" />
-                        </Button>
-
-                        {/* Informations photo en plein écran */}
-                        <div className="absolute bottom-4 left-4 right-4">
-                          <div className="bg-black/60 backdrop-blur-sm rounded-lg p-4 text-center">
-                            <h3 className="text-white font-semibold mb-2">
-                              {enrichedAgency.photos[activePhotoIndex].title}
-                            </h3>
-                            <p className="text-gray-300 text-sm">
-                              {enrichedAgency.photos[activePhotoIndex].description}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Actions de la barre supérieure */}
-              <div className="absolute top-6 right-6 flex space-x-3">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={handleShareAgency}
-                      variant="ghost"
-                      size="icon"
-                      className="bg-black/30 hover:bg-kongo-lime hover:text-on-lime text-white transition-all duration-300 backdrop-blur-sm border border-white/20"
-                      aria-label="Partager cette agence"
-                    >
-                      <Share2 className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="bg-kongo-black text-on-black">
-                    Partager l'agence
-                  </TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={handleBookmarkToggle}
-                      variant="ghost"
-                      size="icon"
-                      className={`transition-all duration-300 backdrop-blur-sm border border-white/20 ${isBookmarked
-                        ? 'bg-kongo-lime text-on-lime hover:bg-kongo-lime-hover'
-                        : 'bg-black/30 hover:bg-kongo-lime hover:text-on-lime text-white'
-                        }`}
-                      aria-label={isBookmarked ? "Retirer des favoris" : "Ajouter aux favoris"}
-                    >
-                      <Bookmark className={`h-5 w-5 ${isBookmarked ? 'fill-current' : ''}`} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="bg-kongo-black text-on-black">
-                    {isBookmarked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-                  </TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={onClose}
-                      variant="ghost"
-                      size="icon"
-                      className="bg-black/30 hover:bg-color-error hover:text-inverse text-white transition-all duration-300 backdrop-blur-sm border border-white/20"
-                      aria-label="Fermer"
-                    >
-                      <X className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="bg-kongo-black text-on-black">
-                    Fermer
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-
-              {/* Informations principales en overlay - Design professionnel */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/75 to-transparent p-8 backdrop-blur-sm">
-                <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between space-y-6 xl:space-y-0">
-                  <div className="flex items-start space-x-6">
-                    <motion.div
-                      className="text-7xl lg:text-8xl filter drop-shadow-2xl"
-                      initial={{ scale: 0, rotate: -180 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ duration: 0.8, type: "spring", bounce: 0.3 }}
-                    >
-                      {agency.logo}
-                    </motion.div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col lg:flex-row lg:items-center space-y-3 lg:space-y-0 lg:space-x-4 mb-4">
-                        <motion.h1
-                          className="text-h2 lg:text-display-2 text-white font-bold leading-tight"
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.3, duration: 0.6 }}
-                        >
-                          {agency.name}
-                        </motion.h1>
-                        <Badge className={`${getTierColor(agency.tier)} text-sm font-semibold border-2 px-4 py-2 shadow-lg`}>
-                          {getTierIcon(agency.tier)} {agency.tier.charAt(0).toUpperCase() + agency.tier.slice(1)}
-                        </Badge>
-                        {agency.isActive && (
-                          <Badge className="status-success px-3 py-1">
-                            <Activity className="w-3 h-3 mr-1 animate-pulse" />
-                            En Ligne
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col lg:flex-row lg:items-center space-y-3 lg:space-y-0 lg:space-x-4 mb-4">
+                          <h1 className="text-3xl lg:text-4xl text-white font-bold leading-tight">
+                            {agency.name}
+                          </h1>
+                          <Badge className={`${getTierColor(agency.tier)} text-sm font-semibold border-2 px-4 py-1.5 shadow-lg`}>
+                            {getTierIcon(agency.tier)} {agency.tier.charAt(0).toUpperCase() + agency.tier.slice(1)}
                           </Badge>
-                        )}
-                      </div>
+                          {agency.isActive && (
+                            <Badge className="bg-[#5CB338] text-white px-3 py-1">
+                              En Ligne
+                            </Badge>
+                          )}
+                        </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
-                        <div className="flex items-center space-x-2 bg-black/70 backdrop-blur-md rounded-lg px-3 py-2">
-                          <MapPin className="w-5 h-5 text-kongo-lime flex-shrink-0" />
-                          <span className="text-body-large font-semibold text-white truncate">{agency.headquarters}</span>
-                        </div>
-                        <div className="flex items-center space-x-2 bg-black/70 backdrop-blur-md rounded-lg px-3 py-2">
-                          <Star className="w-5 h-5 text-yellow-400 fill-current flex-shrink-0" />
-                          <span className="text-body-large font-bold text-white">{agency.rating}</span>
-                          <span className="text-body text-white/80">({agency.totalTrips.toLocaleString()})</span>
-                        </div>
-                        <div className="flex items-center space-x-2 bg-black/70 backdrop-blur-md rounded-lg px-3 py-2">
-                          <Calendar className="w-5 h-5 text-kongo-lime flex-shrink-0" />
-                          <span className="text-body-large font-semibold text-white">Depuis {agency.founded}</span>
-                        </div>
-                        <div className="flex items-center space-x-2 bg-black/70 backdrop-blur-md rounded-lg px-3 py-2">
-                          <Shield className="w-5 h-5 text-green-400 flex-shrink-0" />
-                          <span className="text-body-large font-semibold text-white">{agency.onTimePercentage}% Ponctuel</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-6 bg-black/75 backdrop-blur-md rounded-lg px-4 py-2">
-                        <div className="flex items-center space-x-2">
-                          <Eye className="w-4 h-4 text-white/70" />
-                          <span className="text-body-small text-white/85 font-medium">{(viewCount + 1247).toLocaleString()} vues</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Bus className="w-4 h-4 text-white/70" />
-                          <span className="text-body-small text-white/85 font-medium">{agency.fleetSize} véhicules</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Route className="w-4 h-4 text-white/70" />
-                          <span className="text-body-small text-white/85 font-medium">{agency.operatingRoutes.length} destinations</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Heart className="w-4 h-4 text-red-400" />
-                          <span className="text-body-small text-white/85 font-medium">{enrichedAgency.performanceMetrics.repeatCustomers}% fidèles</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-2">
+                          <div className="flex items-center space-x-2 bg-black/70 backdrop-blur-md rounded-lg px-3 py-2">
+                            <MapPin className="w-5 h-5 text-[#5CB338]" />
+                            <span className="text-sm font-semibold text-white truncate">{agency.headquarters}</span>
+                          </div>
+                          <div className="flex items-center space-x-2 bg-black/70 backdrop-blur-md rounded-lg px-3 py-2">
+                            <Star className="w-5 h-5 text-yellow-400 fill-current" />
+                            <span className="text-sm font-bold text-white">{avgRating}</span>
+                            <span className="text-xs text-white/80">({totalReviewsCount} avis)</span>
+                          </div>
+                          <div className="flex items-center space-x-2 bg-black/70 backdrop-blur-md rounded-lg px-3 py-2">
+                            <Calendar className="w-5 h-5 text-[#5CB338]" />
+                            <span className="text-sm font-semibold text-white">Depuis {agency.founded}</span>
+                          </div>
+                          <div className="flex items-center space-x-2 bg-black/70 backdrop-blur-md rounded-lg px-3 py-2">
+                            <Shield className="w-5 h-5 text-green-400" />
+                            <span className="text-sm font-semibold text-white">{agency.onTimePercentage}% Ponctuel</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Actions rapides améliorées */}
-                  <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
-                    <Button
-                      onClick={handleBookingAction}
-                      className="btn-secondary px-8 py-4 text-base font-semibold shadow-kongo-lime hover:shadow-kongo-lime/50 transition-all duration-300"
-                    >
-                      <Calendar className="w-5 h-5 mr-2" />
-                      Réserver Maintenant
-                    </Button>
-                    <Button
-                      onClick={() => handleContactAction('whatsapp')}
-                      variant="outline"
-                      className="bg-green-600 border-green-500 text-white hover:bg-green-700 hover:border-green-600 px-8 py-4 text-base backdrop-blur-sm shadow-lg"
-                    >
-                      <MessageCircle className="w-5 h-5 mr-2" />
-                      WhatsApp
-                    </Button>
-                    <Button
-                      onClick={() => handleContactAction('phone')}
-                      variant="outline"
-                      className="bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white/50 px-8 py-4 text-base backdrop-blur-sm"
-                    >
-                      <Phone className="w-5 h-5 mr-2" />
-                      Appeler
-                    </Button>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Contenu principal avec tabs améliorés */}
             <ScrollArea className="h-[calc(98vh-400px)]">
               <div className="p-8">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-5 mb-8 h-14 bg-surface-secondary border border-border-primary shadow-sm">
-                    <TabsTrigger value="overview" className="text-body font-medium data-[state=active]:bg-kongo-lime data-[state=active]:text-on-lime transition-all duration-200">
-                      <Award className="w-4 h-4 mr-2" />
-                      <span className="hidden sm:inline">Aperçu</span>
+                  <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-8 h-auto p-2 bg-gray-100 border-2 border-gray-300 rounded-2xl shadow-inner gap-2">
+                    <TabsTrigger
+                      value="overview"
+                      className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-sm sm:text-base cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+                    >
+                      <Award className="w-5 h-5 shrink-0" />
+                      <span>Aperçu</span>
                     </TabsTrigger>
-                    <TabsTrigger value="performance" className="text-body font-medium data-[state=active]:bg-kongo-lime data-[state=active]:text-on-lime transition-all duration-200">
-                      <TrendingUp className="w-4 h-4 mr-2" />
-                      <span className="hidden sm:inline">Performance</span>
+
+                    <TabsTrigger
+                      value="performance"
+                      className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-sm sm:text-base cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+                    >
+                      <TrendingUp className="w-5 h-5 shrink-0" />
+                      <span>Performance</span>
                     </TabsTrigger>
-                    <TabsTrigger value="services" className="text-body font-medium data-[state=active]:bg-kongo-lime data-[state=active]:text-on-lime transition-all duration-200">
-                      <Shield className="w-4 h-4 mr-2" />
-                      <span className="hidden sm:inline">Services</span>
+
+                    <TabsTrigger
+                      value="services"
+                      className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-sm sm:text-base cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+                    >
+                      <Shield className="w-5 h-5 shrink-0" />
+                      <span>Services</span>
                     </TabsTrigger>
-                    <TabsTrigger value="reviews" className="text-body font-medium data-[state=active]:bg-kongo-lime data-[state=active]:text-on-lime transition-all duration-200">
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      <span className="hidden sm:inline">Avis</span>
+
+                    <TabsTrigger
+                      value="reviews"
+                      className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-sm sm:text-base cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+                    >
+                      <MessageCircle className="w-5 h-5 shrink-0" />
+                      <span>Avis ({totalReviewsCount})</span>
                     </TabsTrigger>
-                    <TabsTrigger value="contact" className="text-body font-medium data-[state=active]:bg-kongo-lime data-[state=active]:text-on-lime transition-all duration-200">
-                      <Phone className="w-4 h-4 mr-2" />
-                      <span className="hidden sm:inline">Contact</span>
+
+                    <TabsTrigger
+                      value="contact"
+                      className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-sm sm:text-base cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+                    >
+                      <Phone className="w-5 h-5 shrink-0" />
+                      <span>Contact</span>
                     </TabsTrigger>
                   </TabsList>
 
@@ -964,7 +725,7 @@ export function AgencyDetails({ agency, isOpen, onClose }: AgencyDetailsProps) {
                     <Card className="card-elevated">
                       <CardHeader>
                         <CardTitle className="text-h4 text-kongo-black flex items-center font-semibold">
-                          <Award className="w-6 h-6 mr-3 text-kongo-lime" />
+                          <Award className="w-6 h-6 mr-3 text-[#5CB338]" />
                           À propos de {agency.name}
                         </CardTitle>
                       </CardHeader>
@@ -973,9 +734,8 @@ export function AgencyDetails({ agency, isOpen, onClose }: AgencyDetailsProps) {
                           {agency.description}
                         </p>
 
-                        {/* Statistiques détaillées */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div className="text-center p-6 bg-surface-kongo-lime-light rounded-xl border border-kongo-lime/20">
+                          <div className="text-center p-6 bg-surface-secondary rounded-xl border border-border-primary">
                             <div className="text-h3 text-kongo-black font-bold">
                               {enrichedAgency.performanceMetrics.monthlyTrips}
                             </div>
@@ -1004,50 +764,24 @@ export function AgencyDetails({ agency, isOpen, onClose }: AgencyDetailsProps) {
                     <Card className="card-elevated">
                       <CardHeader>
                         <CardTitle className="text-h4 text-kongo-black flex items-center font-semibold">
-                          <TrendingUp className="w-6 h-6 mr-3 text-kongo-lime" />
+                          <TrendingUp className="w-6 h-6 mr-3 text-[#5CB338]" />
                           Performance de l'agence
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="p-6 bg-surface-kongo-lime-light rounded-xl border border-kongo-lime/20">
+                          <div className="p-6 bg-surface-secondary rounded-xl border border-border-primary">
                             <div className="text-h3 text-kongo-black font-bold">
                               {enrichedAgency.kpiMetrics.serviceScore}%
                             </div>
                             <div className="text-body-small text-kongo-black font-medium">Satisfaction client</div>
-                            <div className="mt-4">
-                              <Progress value={enrichedAgency.kpiMetrics.serviceScore} className="h-2 bg-kongo-lime/30" />
-                            </div>
                           </div>
 
-                          <div className="p-6 bg-surface-kongo-lime-light rounded-xl border border-kongo-lime/20">
+                          <div className="p-6 bg-surface-secondary rounded-xl border border-border-primary">
                             <div className="text-h3 text-kongo-black font-bold">
                               {enrichedAgency.kpiMetrics.safetyScore}%
                             </div>
                             <div className="text-body-small text-kongo-black font-medium">Sécurité</div>
-                            <div className="mt-4">
-                              <Progress value={enrichedAgency.kpiMetrics.safetyScore} className="h-2 bg-kongo-lime/30" />
-                            </div>
-                          </div>
-
-                          <div className="p-6 bg-surface-kongo-lime-light rounded-xl border border-kongo-lime/20">
-                            <div className="text-h3 text-kongo-black font-bold">
-                              {enrichedAgency.kpiMetrics.environmentScore}%
-                            </div>
-                            <div className="text-body-small text-kongo-black font-medium">Environnement</div>
-                            <div className="mt-4">
-                              <Progress value={enrichedAgency.kpiMetrics.environmentScore} className="h-2 bg-kongo-lime/30" />
-                            </div>
-                          </div>
-
-                          <div className="p-6 bg-surface-kongo-lime-light rounded-xl border border-kongo-lime/20">
-                            <div className="text-h3 text-kongo-black font-bold">
-                              {enrichedAgency.kpiMetrics.digitalScore}%
-                            </div>
-                            <div className="text-body-small text-kongo-black font-medium">Digital</div>
-                            <div className="mt-4">
-                              <Progress value={enrichedAgency.kpiMetrics.digitalScore} className="h-2 bg-kongo-lime/30" />
-                            </div>
                           </div>
                         </div>
                       </CardContent>
@@ -1058,59 +792,18 @@ export function AgencyDetails({ agency, isOpen, onClose }: AgencyDetailsProps) {
                     <Card className="card-elevated">
                       <CardHeader>
                         <CardTitle className="text-h4 text-kongo-black flex items-center font-semibold">
-                          <Shield className="w-6 h-6 mr-3 text-kongo-lime" />
+                          <Shield className="w-6 h-6 mr-3 text-[#5CB338]" />
                           Services disponibles
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {agency.amenities.map((amenity, index) => (
-                            <motion.div
-                              key={index}
-                              className="flex items-center space-x-3 p-4 bg-surface-secondary rounded-lg hover:bg-surface-tertiary transition-colors duration-200"
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: index * 0.1 }}
-                            >
+                            <div key={index} className="flex items-center space-x-3 p-4 bg-surface-secondary rounded-lg">
                               {getAmenityIcon(amenity)}
                               <span className="text-body text-kongo-black font-medium">{amenity}</span>
-                            </motion.div>
+                            </div>
                           ))}
-                        </div>
-
-                        {/* Services premium additionnels */}
-                        <Separator className="my-6" />
-                        <div className="space-y-4">
-                          <h4 className="text-h5 text-kongo-black font-semibold">Services Premium</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {enrichedAgency.premiumServices.map((service, index) => (
-                              <motion.div
-                                key={index}
-                                className={`flex items-start space-x-3 p-4 rounded-lg border-2 transition-all duration-200 ${service.available
-                                  ? 'bg-surface-kongo-lime-light border-kongo-lime/30 hover:border-kongo-lime/50'
-                                  : 'bg-surface-tertiary border-border-secondary opacity-60'
-                                  }`}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.1 }}
-                              >
-                                <div className={`p-2 rounded-lg ${service.available ? 'bg-white/80' : 'bg-gray-300'}`}>
-                                  <service.icon className="w-5 h-5" />
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center space-x-2 mb-1">
-                                    <span className="text-label font-semibold text-kongo-black">{service.name}</span>
-                                    {service.available && (
-                                      <CheckCircle className="w-4 h-4 text-green-600" />
-                                    )}
-                                  </div>
-                                  <p className="text-body-small text-secondary leading-relaxed">
-                                    {service.description}
-                                  </p>
-                                </div>
-                              </motion.div>
-                            ))}
-                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -1118,216 +811,369 @@ export function AgencyDetails({ agency, isOpen, onClose }: AgencyDetailsProps) {
 
                   <TabsContent value="reviews">
                     <Card className="card-elevated">
-                      <CardHeader>
-                        <CardTitle className="text-h4 text-kongo-black flex items-center font-semibold">
-                          <MessageCircle className="w-6 h-6 mr-3 text-kongo-lime" />
-                          Avis des voyageurs
-                        </CardTitle>
+                      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                          <CardTitle className="text-h4 text-kongo-black flex items-center font-semibold">
+                            <MessageCircle className="w-6 h-6 mr-3 text-[#5CB338]" />
+                            Avis des voyageurs
+                          </CardTitle>
+                          <p className="text-sm text-gray-500 mt-1">
+                            Note globale : <span className="font-bold text-[#1D1D1F] text-base">{avgRating} / 5</span> ({totalReviewsCount} avis publiés)
+                          </p>
+                        </div>
+                        <Button
+                          onClick={handleToggleAddReview}
+                          style={
+                            showAddReviewForm
+                              ? { backgroundColor: '#1D1D1F', color: '#C8E63C', borderColor: '#C8E63C' }
+                              : { backgroundColor: '#16A34A', color: '#FFFFFF', borderColor: '#15803D' }
+                          }
+                          className={
+                            showAddReviewForm
+                              ? "bg-[#1D1D1F] text-[#C8E63C] hover:bg-black border-2 border-[#C8E63C] text-base font-extrabold px-6 py-3.5 rounded-2xl shadow-lg flex items-center gap-2"
+                              : "bg-[#16A34A] text-white hover:bg-[#15803D] border-2 border-[#15803D] text-base sm:text-lg font-black px-7 py-3.5 rounded-2xl shadow-xl flex items-center gap-2"
+                          }
+                        >
+                          {showAddReviewForm ? (
+                            <>
+                              <X className="w-5 h-5 text-[#C8E63C]" />
+                              <span className="text-[#C8E63C] font-extrabold text-base">Fermer le formulaire</span>
+                            </>
+                          ) : (
+                            <>
+                              <Pencil className="w-5 h-5 text-white" />
+                              <span className="text-white font-black text-base sm:text-lg">✍️ Laisser un avis</span>
+                            </>
+                          )}
+                        </Button>
                       </CardHeader>
                       <CardContent>
-                        <div className="space-y-6">
-                          {enrichedAgency.recentReviews.map((review) => (
-                            <motion.div
-                              key={review.id}
-                              className="border-b border-border-primary pb-6 last:border-b-0"
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: review.id * 0.1 }}
-                            >
-                              <div className="flex items-start space-x-4">
-                                <Avatar className="w-12 h-12">
-                                  <AvatarFallback className="bg-kongo-lime text-kongo-black">
-                                    {review.name.charAt(0)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                  <div className="flex items-center space-x-2 mb-2">
-                                    <span className="text-body-large font-semibold text-kongo-black">{review.name}</span>
-                                    {review.verified && (
-                                      <Badge className="status-success text-xs">
-                                        <CheckCircle className="w-3 h-3 mr-1" />
-                                        Vérifié
-                                      </Badge>
-                                    )}
-                                    <Badge variant="outline" className="text-xs">
-                                      {review.tripType}
-                                    </Badge>
-                                  </div>
-                                  <div className="flex items-center space-x-1 mb-3">
-                                    {[...Array(5)].map((_, i) => (
-                                      <Star
-                                        key={i}
-                                        className={`w-4 h-4 ${i < review.rating ? 'text-yellow-500 fill-current' : 'text-gray-300'
-                                          }`}
-                                      />
-                                    ))}
-                                    <span className="text-body-small text-secondary ml-2">{review.date}</span>
-                                    <span className="text-body-small text-secondary">•</span>
-                                    <span className="text-body-small text-secondary">{review.route}</span>
-                                  </div>
-                                  <p className="text-body text-kongo-black leading-relaxed">{review.comment}</p>
-                                </div>
+                        {/* Banner non connecté */}
+                        {!currentUser && (
+                          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-4 mb-6 text-amber-900 shadow-sm">
+                            <div className="flex items-center gap-3">
+                              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                              <p className="text-xs font-semibold">
+                                Seuls les voyageurs possédant un compte et connectés peuvent évaluer et publier un avis sur cette agence.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Formulaire d'ajout d'avis */}
+                        {showAddReviewForm && (
+                          <motion.form
+                            onSubmit={handleSubmitReview}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="p-6 bg-surface-secondary rounded-2xl border border-black/10 space-y-4 mb-8 shadow-sm"
+                          >
+                            <h4 className="text-base font-bold text-kongo-black flex items-center gap-2">
+                              <Star className="w-5 h-5 text-yellow-500 fill-current" />
+                              Publier votre avis sur {agency.name}
+                            </h4>
+
+                            <div className="flex items-center gap-3 py-1">
+                              <span className="text-xs font-bold uppercase tracking-wider text-gray-700">Note globale :</span>
+                              <div className="flex items-center gap-1">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <button
+                                    type="button"
+                                    key={star}
+                                    onClick={() => setNewRating(star)}
+                                    onMouseEnter={() => setHoverRating(star)}
+                                    onMouseLeave={() => setHoverRating(0)}
+                                    className="p-1 focus:outline-none transition-transform hover:scale-125"
+                                  >
+                                    <Star
+                                      className={`w-7 h-7 ${
+                                        star <= (hoverRating || newRating)
+                                          ? "text-yellow-500 fill-current"
+                                          : "text-gray-300"
+                                      }`}
+                                    />
+                                  </button>
+                                ))}
+                                <span className="ml-2 font-bold text-sm text-kongo-black">{newRating} / 5</span>
                               </div>
-                            </motion.div>
-                          ))}
-                        </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Votre Nom / Pseudo *</label>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="Ex: Marie Kalala"
+                                  value={newAuthorName}
+                                  onChange={(e) => setNewAuthorName(e.target.value)}
+                                  className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#5CB338]"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Trajet effectué</label>
+                                <input
+                                  type="text"
+                                  placeholder="Ex: Kinshasa → Lubumbashi"
+                                  value={newRoute}
+                                  onChange={(e) => setNewRoute(e.target.value)}
+                                  className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#5CB338]"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Type de voyage</label>
+                              <select
+                                value={newTripType}
+                                onChange={(e) => setNewTripType(e.target.value)}
+                                className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#5CB338]"
+                              >
+                                <option value="VIP">VIP</option>
+                                <option value="Standard">Standard</option>
+                                <option value="Premium">Premium</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Votre commentaire *</label>
+                              <textarea
+                                required
+                                rows={3}
+                                placeholder="Partagez votre expérience : ponctualité, confort du véhicule, accueil..."
+                                value={newComment}
+                                onChange={(e) => setNewComment(e.target.value)}
+                                className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#5CB338]"
+                              />
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-3">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setShowAddReviewForm(false)}
+                                className="rounded-2xl border-2 border-gray-400 text-gray-800 text-base font-bold px-6 py-3.5 hover:bg-gray-100"
+                              >
+                                Annuler
+                              </Button>
+                              <Button
+                                type="submit"
+                                disabled={submittingReview}
+                                style={{ backgroundColor: '#1D1D1F', color: '#C8E63C', borderColor: '#C8E63C' }}
+                                className="bg-[#1D1D1F] text-[#C8E63C] hover:bg-black border-2 border-[#C8E63C] text-base sm:text-lg font-black rounded-2xl px-8 py-3.5 shadow-xl flex items-center justify-center gap-2"
+                              >
+                                {submittingReview ? (
+                                  <span className="text-[#C8E63C] font-extrabold">Publication en cours...</span>
+                                ) : (
+                                  <>
+                                    <Zap className="w-5 h-5 text-[#C8E63C] fill-current" />
+                                    <span className="text-[#C8E63C] font-black text-base sm:text-lg">Envoyer mon avis</span>
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </motion.form>
+                        )}
+
+                        {/* Liste des avis */}
+                        {loadingReviews ? (
+                          <div className="py-12 text-center text-gray-400 text-sm animate-pulse">
+                            Chargement des avis...
+                          </div>
+                        ) : (
+                          <div className="space-y-6">
+                            {reviewsList.map((review, index) => {
+                              const isOwner = currentUser && review.user_id === currentUser.id;
+                              const isEditing = editingReviewId === review.id;
+
+                              return (
+                                <motion.div
+                                  key={review.id || index}
+                                  className="border-b border-border-primary pb-6 last:border-b-0"
+                                  initial={{ opacity: 0, y: 15 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: index * 0.05 }}
+                                >
+                                  {/* ── Formulaire d'édition inline ── */}
+                                  {isEditing ? (
+                                    <motion.form
+                                      onSubmit={(e) => handleUpdateReview(e, review.id)}
+                                      initial={{ opacity: 0, height: 0 }}
+                                      animate={{ opacity: 1, height: "auto" }}
+                                      className="p-5 bg-surface-secondary rounded-2xl border border-[#5CB338]/30 space-y-4 shadow-sm"
+                                    >
+                                      <h4 className="text-sm font-bold text-kongo-black flex items-center gap-2">
+                                        <Pencil className="w-4 h-4 text-[#5CB338]" />
+                                        Modifier votre avis
+                                      </h4>
+                                      {/* Note étoiles */}
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-gray-700">Note :</span>
+                                        <div className="flex items-center gap-1">
+                                          {[1, 2, 3, 4, 5].map((star) => (
+                                            <button
+                                              type="button"
+                                              key={star}
+                                              onClick={() => setEditRating(star)}
+                                              onMouseEnter={() => setEditHoverRating(star)}
+                                              onMouseLeave={() => setEditHoverRating(0)}
+                                              className="p-0.5 focus:outline-none transition-transform hover:scale-125"
+                                            >
+                                              <Star
+                                                className={`w-6 h-6 ${
+                                                  star <= (editHoverRating || editRating)
+                                                    ? "text-yellow-500 fill-current"
+                                                    : "text-gray-300"
+                                                }`}
+                                              />
+                                            </button>
+                                          ))}
+                                          <span className="ml-1 font-bold text-sm text-kongo-black">{editRating}/5</span>
+                                        </div>
+                                      </div>
+                                      {/* Route & type */}
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <input
+                                          type="text"
+                                          value={editRoute}
+                                          onChange={(e) => setEditRoute(e.target.value)}
+                                          placeholder="Trajet effectué"
+                                          className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#5CB338]"
+                                        />
+                                        <select
+                                          value={editTripType}
+                                          onChange={(e) => setEditTripType(e.target.value)}
+                                          className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#5CB338]"
+                                        >
+                                          <option value="VIP">VIP</option>
+                                          <option value="Standard">Standard</option>
+                                          <option value="Premium">Premium</option>
+                                        </select>
+                                      </div>
+                                      {/* Commentaire */}
+                                      <textarea
+                                        required
+                                        rows={3}
+                                        value={editComment}
+                                        onChange={(e) => setEditComment(e.target.value)}
+                                        placeholder="Votre commentaire..."
+                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#5CB338]"
+                                      />
+                                      <div className="flex justify-end gap-3">
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          onClick={() => setEditingReviewId(null)}
+                                          className="rounded-xl text-sm"
+                                        >
+                                          Annuler
+                                        </Button>
+                                        <Button
+                                          type="submit"
+                                          disabled={savingEdit}
+                                          className="bg-[#5CB338] text-white hover:bg-[#4ea22e] font-bold rounded-xl px-5 text-sm"
+                                        >
+                                          {savingEdit ? "Enregistrement..." : "Sauvegarder"}
+                                        </Button>
+                                      </div>
+                                    </motion.form>
+                                  ) : (
+                                    /* ── Affichage normal de l'avis ── */
+                                    <div className="flex items-start space-x-4">
+                                      <Avatar className="w-12 h-12">
+                                        <AvatarFallback className="bg-[#5CB338] text-white font-bold">
+                                          {(review.author_name || review.name || "A").charAt(0)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <div className="flex items-center space-x-2">
+                                            <span className="text-body-large font-semibold text-kongo-black">
+                                              {review.author_name || review.name}
+                                            </span>
+                                            {(review.verified || review.is_verified) && (
+                                              <Badge className="status-success text-xs">
+                                                <CheckCircle className="w-3 h-3 mr-1" />
+                                                Vérifié
+                                              </Badge>
+                                            )}
+                                            <Badge variant="outline" className="text-xs">
+                                              {review.trip_type || review.tripType || "Standard"}
+                                            </Badge>
+                                          </div>
+                                          {/* Boutons modifier / supprimer (auteur seulement) */}
+                                          {isOwner && review.user_id && (
+                                            <div className="flex items-center gap-2">
+                                              <button
+                                                onClick={() => handleEditReview(review)}
+                                                className="flex items-center gap-1 text-xs font-semibold text-[#5CB338] hover:text-[#4ea22e] transition-colors px-2 py-1 rounded-lg hover:bg-[#5CB338]/10"
+                                              >
+                                                <Pencil className="w-3.5 h-3.5" />
+                                                Modifier
+                                              </button>
+                                              <button
+                                                onClick={() => handleDeleteReview(review.id)}
+                                                disabled={deletingReviewId === review.id}
+                                                className="flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-700 transition-colors px-2 py-1 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                                {deletingReviewId === review.id ? "..." : "Supprimer"}
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center space-x-1 mb-3">
+                                          {[...Array(5)].map((_, i) => (
+                                            <Star
+                                              key={i}
+                                              className={`w-4 h-4 ${
+                                                i < Math.round(Number(review.rating))
+                                                  ? 'text-yellow-500 fill-current'
+                                                  : 'text-gray-300'
+                                              }`}
+                                            />
+                                          ))}
+                                          <span className="text-body-small text-secondary ml-2">
+                                            {review.created_at
+                                              ? new Date(review.created_at).toLocaleDateString('fr-FR')
+                                              : (review.date || 'Récents')}
+                                          </span>
+                                          <span className="text-body-small text-secondary">•</span>
+                                          <span className="text-body-small text-secondary">{review.route}</span>
+                                        </div>
+                                        <p className="text-body text-kongo-black leading-relaxed">{review.comment}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </motion.div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </TabsContent>
 
                   <TabsContent value="contact">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <Card className="card-elevated">
-                        <CardHeader>
-                          <CardTitle className="text-h4 text-kongo-black font-semibold flex items-center">
-                            <Phone className="w-6 h-6 mr-3 text-kongo-lime" />
-                            Informations de contact
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                          <motion.div
-                            className="flex items-center space-x-4 p-4 bg-surface-secondary rounded-xl hover:bg-surface-tertiary transition-colors duration-200"
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            <div className="p-3 bg-kongo-lime rounded-lg">
-                              <Phone className="w-6 h-6 text-on-lime" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="text-label font-semibold text-kongo-black">Téléphone</div>
-                              <div className="text-body text-secondary">{agency.phone}</div>
-                            </div>
-                            <Button onClick={() => handleContactAction('phone')} className="btn-primary">
-                              Appeler
-                            </Button>
-                          </motion.div>
-
-                          <motion.div
-                            className="flex items-center space-x-4 p-4 bg-surface-secondary rounded-xl hover:bg-surface-tertiary transition-colors duration-200"
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            <div className="p-3 bg-color-info rounded-lg">
-                              <Mail className="w-6 h-6 text-white" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="text-label font-semibold text-kongo-black">Email</div>
-                              <div className="text-body text-secondary">{agency.email}</div>
-                            </div>
-                            <Button onClick={() => handleContactAction('email')} variant="outline">
-                              Écrire
-                            </Button>
-                          </motion.div>
-
-                          <motion.div
-                            className="flex items-center space-x-4 p-4 bg-surface-secondary rounded-xl hover:bg-surface-tertiary transition-colors duration-200"
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            <div className="p-3 bg-color-success rounded-lg">
-                              <Globe className="w-6 h-6 text-white" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="text-label font-semibold text-kongo-black">Site web</div>
-                              <div className="text-body text-secondary">{agency.website}</div>
-                            </div>
-                            <Button onClick={() => handleContactAction('website')} variant="outline">
-                              <ExternalLink className="w-4 h-4 mr-2" />
-                              Visiter
-                            </Button>
-                          </motion.div>
-
-                          {/* Horaires d'ouverture */}
-                          <div className="p-4 bg-surface-secondary rounded-xl">
-                            <h4 className="text-label font-semibold text-kongo-black mb-3 flex items-center">
-                              <Clock className="w-4 h-4 mr-2 text-kongo-lime" />
-                              Horaires d'ouverture
-                            </h4>
-                            <div className="space-y-2">
-                              {Object.entries(enrichedAgency.businessHours).map(([day, hours]) => (
-                                <div key={day} className="flex items-center justify-between">
-                                  <span className="text-body text-kongo-black">{day}</span>
-                                  <span className="text-body font-medium text-secondary">{hours}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="card-kongo">
-                        <CardHeader>
-                          <CardTitle className="text-h4 text-on-black font-semibold flex items-center">
-                            <Zap className="w-6 h-6 mr-3 text-kongo-lime" />
-                            Actions rapides
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                          <motion.div
-                            className="p-6 bg-kongo-lime rounded-xl text-center cursor-pointer hover:bg-kongo-lime-hover transition-colors duration-200"
-                            onClick={handleBookingAction}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            <Calendar className="w-8 h-8 text-on-lime mx-auto mb-3" />
-                            <div className="text-h5 text-on-lime font-bold mb-2">Réserver un voyage</div>
-                            <div className="text-body-small text-on-lime opacity-90">
-                              Accédez directement à la recherche avec cette agence
-                            </div>
-                          </motion.div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <motion.div
-                              className="p-4 bg-kongo-black-light rounded-lg text-center cursor-pointer hover:bg-kongo-black transition-colors duration-200"
-                              onClick={handleShareAgency}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                            >
-                              <Share2 className="w-6 h-6 text-kongo-lime mx-auto mb-2" />
-                              <div className="text-body-small text-on-black font-medium">Partager</div>
-                            </motion.div>
-
-                            <motion.div
-                              className="p-4 bg-kongo-black-light rounded-lg text-center cursor-pointer hover:bg-kongo-black transition-colors duration-200"
-                              onClick={handleBookmarkToggle}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                            >
-                              <Bookmark className={`w-6 h-6 mx-auto mb-2 ${isBookmarked ? 'text-kongo-lime fill-current' : 'text-on-black'}`} />
-                              <div className="text-body-small text-on-black font-medium">
-                                {isBookmarked ? 'Favori' : 'Sauver'}
-                              </div>
-                            </motion.div>
-                          </div>
-
-                          {/* Routes populaires */}
-                          <div className="space-y-3">
-                            <h4 className="text-label font-semibold text-on-black">Routes populaires</h4>
-                            <div className="space-y-2">
-                              {enrichedAgency.popularRoutes.slice(0, 3).map((route, index) => (
-                                <motion.div
-                                  key={route.id}
-                                  className="flex items-center justify-between p-3 bg-kongo-black-light rounded-lg hover:bg-kongo-black transition-colors duration-200"
-                                  initial={{ opacity: 0, x: -20 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: index * 0.1 }}
-                                >
-                                  <div className="flex items-center space-x-2">
-                                    <Navigation className="w-4 h-4 text-kongo-lime" />
-                                    <span className="text-body-small text-on-black font-medium">
-                                      {route.from} → {route.to}
-                                    </span>
-                                  </div>
-                                  <Badge variant="outline" className="text-xs">
-                                    {route.duration}
-                                  </Badge>
-                                </motion.div>
-                              ))}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
+                    <Card className="card-elevated">
+                      <CardHeader>
+                        <CardTitle className="text-h4 text-kongo-black font-semibold flex items-center">
+                          <Phone className="w-6 h-6 mr-3 text-[#5CB338]" />
+                          Informations de contact
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="p-4 bg-surface-secondary rounded-xl">
+                          <div className="text-label font-semibold text-kongo-black">Téléphone</div>
+                          <div className="text-body text-secondary">{agency.phone}</div>
+                        </div>
+                        <div className="p-4 bg-surface-secondary rounded-xl">
+                          <div className="text-label font-semibold text-kongo-black">Email</div>
+                          <div className="text-body text-secondary">{agency.email}</div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </TabsContent>
                 </Tabs>
               </div>

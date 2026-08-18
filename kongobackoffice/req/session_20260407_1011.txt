@@ -1,0 +1,16 @@
+# Session Log - 2026-04-07
+## Objectif: Refonte Design "Corporate Pro"
+L'utilisateur (et la persona manager 60 ans) a rejeté le design "Premium Dark/Glow".
+Nous pivotons vers un style "Corporate", sobre, haute-visibilité et professionnel.
+
+## Fichiers à modifier:
+- [ ] src/index.css (Variables de thème)
+- [ ] src/components/admin/DashboardLayout.tsx (Conversion Light/Corporate)
+- [ ] src/components/admin/AgencyDashboard.tsx (Nettoyage visuel)
+- [ ] src/components/admin/AdminForms.tsx (Sobriété des formulaires)
+
+## Statut des Agents:
+- Brainstorming: OK (Concept: KonGO Corporate Pro)
+- Stitch: En cours (Mise à jour des tokens)
+- Dev: En attente
+- QA: En attente

@@ -121,9 +121,11 @@ export function HeaderActions({
   return (
     <div className="flex items-center space-x-3">
       {/* Language Selector */}
+      {/* [Agent Stitch] - Action: Hide language selector on desktop for double-tier header */}
       <motion.div
         variants={actionItemVariants}
         custom={0}
+        className="lg:hidden"
       >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -169,7 +171,8 @@ export function HeaderActions({
       </motion.div>
 
       {/* Quick Search Button - Desktop */}
-      <div className="hidden md:block">
+      {/* [Agent Stitch] - Action: Hide quick search button on desktop for double-tier header */}
+      <div className="hidden md:block lg:hidden">
         <motion.div
           variants={actionItemVariants}
           custom={0}
@@ -194,10 +197,12 @@ export function HeaderActions({
       </div>
 
       {/* Notifications Button */}
+      {/* [Agent Stitch] - Action: Hide notifications on desktop for double-tier header */}
       {onToggleNotifications && (
         <motion.div
           variants={actionItemVariants}
           custom={1}
+          className="lg:hidden"
         >
           <motion.div
             variants={buttonHoverVariants}
@@ -228,7 +233,8 @@ export function HeaderActions({
       )}
 
       {/* Quick Actions - Desktop */}
-      <div className="hidden lg:flex items-center space-x-2">
+      {/* [Agent Stitch] - Action: Hide quick actions on desktop for double-tier header */}
+      <div className="hidden items-center space-x-2">
         <motion.div
           variants={actionItemVariants}
           custom={2}

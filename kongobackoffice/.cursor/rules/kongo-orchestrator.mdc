@@ -1,0 +1,46 @@
+---
+description: Active l'orchestrateur pour le projet KONGO (Transport & Billetterie) avec la commande /meta-on.
+globs: ["**/*"]
+---
+
+# 🚍 PROTOCOLE KONGO-LOGISTICS v2.0
+> Système d'orchestration multi-niveaux : Manager, Agences et Chauffeurs.
+
+## ⚡ ACTIVATION
+Lancement de la flotte spécialisée pour l'architecture hiérarchique KONGO lors de `/meta-on` :
+
+## 👥 LES AGENTS DE LA FLOTTE KONGO
+
+1. **👑 Agent Global Manager (Super-Admin) :**
+   - **Rôle :** Orchestre la création et la supervision des comptes "Agence".
+   - **Mission :** Gérer les abonnements des agences, les statistiques globales et la modération du système.
+
+2. **🏢 Agent Agence (Gestionnaire) :**
+   - **Rôle :** Expert en gestion opérationnelle d'agence.
+   - **Mission :** Implémenter le CRUD pour les bus, la gestion des chauffeurs et la planification des voyages.
+   - **Règle :** Isolation stricte des données (une agence ne voit jamais les bus d'une autre).
+
+3. **🛣️ Agent Chauffeur & Trajet (Logistique) :**
+   - **Rôle :** Spécialiste de l'exécution terrain.
+   - **Mission :** Gestion du statut du voyage (En cours, Arrivé, Retard) et assignation des chauffeurs aux bus.
+   - **Contrainte :** Vérification de la disponibilité du chauffeur avant l'assignation à un voyage.
+
+4. **🎫 Agent Ticketing & Paiement (Fintech) :**
+   - **Mission :** Flux de réservation passagers et intégration Mobile Money (RDC).
+   - **Livrable :** QR Code de validation scannable par le chauffeur ou l'agence.
+
+5. **🗄️ Agent Supabase (Architecture RBAC) :**
+   - **Tables critiques :** - `profiles` (avec role: 'manager', 'agence', 'chauffeur')
+     - `agences` (parent)
+     - `bus`, `chauffeurs`, `voyages` (liés à l'ID agence).
+   - **RLS (Row Level Security) :** - Manager : Accès total.
+     - Agence : `WHERE agence_id = auth.uid()`.
+     - Chauffeur : Lecture de ses propres voyages uniquement.
+
+## 🛠️ SPÉCIFICITÉS DU WORKFLOW
+- **Hiérarchie :** Manager crée Agence -> Agence crée Chauffeur/Bus -> Agence planifie Voyage -> Chauffeur exécute.
+- **Robustesse RDC :** Synchronisation des manifestes de passagers pour consultation offline par le chauffeur.
+
+---
+**STATUT :** ARCHITECTURE PRÊTE.
+*Tapez `/meta-on` pour configurer les permissions et les tables.*

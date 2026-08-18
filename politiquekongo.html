@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Politique de confidentialité - kongo</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --text: #15233a;
+      --muted: #5f6c84;
+      --primary: #1c7ed6;
+      --primary-dark: #12589a;
+      --border: #dbe5f0;
+      --accent: #e8f3ff;
+      --shadow: 0 16px 40px rgba(20, 41, 74, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(28, 126, 214, 0.12), transparent 30%),
+        linear-gradient(180deg, #f9fbff 0%, var(--bg) 100%);
+      line-height: 1.72;
+    }
+
+    .page {
+      max-width: 1100px;
+      margin: 40px auto;
+      padding: 0 20px 60px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+      color: white;
+      padding: 32px 34px;
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 4vw, 3rem);
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 760px;
+      font-size: 1.02rem;
+      opacity: 0.95;
+    }
+
+    .summary {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+
+    .summary h2,
+    .section h2 {
+      margin-top: 0;
+      color: var(--primary-dark);
+      font-size: 1.45rem;
+    }
+
+    .toc {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .toc a {
+      text-decoration: none;
+      color: var(--text);
+      background: var(--accent);
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      border-radius: 12px;
+      transition: 0.2s ease;
+      font-weight: 600;
+    }
+
+    .toc a:hover {
+      transform: translateY(-1px);
+      background: #d9ebff;
+    }
+
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .section p,
+    .section li {
+      color: #293447;
+      font-size: 0.98rem;
+    }
+
+    .section ul {
+      padding-left: 20px;
+    }
+
+    .kicker {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(28, 126, 214, 0.12);
+      color: var(--primary-dark);
+      font-size: 0.82rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .note {
+      background: #fff9e8;
+      border-left: 4px solid #f0b429;
+      padding: 12px 14px;
+      border-radius: 10px;
+      margin: 14px 0;
+    }
+
+    .footer {
+      text-align: center;
+      color: var(--muted);
+      margin-top: 14px;
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 640px) {
+      .page { padding: 0 12px 40px; }
+      .hero, .summary, .section { padding: 18px; border-radius: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="kicker">kongo</div>
+      <h1>Privacy Policy</h1>
+      <p>
+        This Privacy Notice for kongo describes how and why we access, collect, store, use,
+        and share personal information when you use our services.
+      </p>
+    </section>
+
+    <section class="summary">
+      <h2>Résumé des points clés</h2>
+      <p>
+        Kongo est une plateforme numérique de réservation de transport interurbain qui met en
+        relation voyageurs et agences de transport via une plateforme web, applications mobiles
+        et bornes de réservation.
+      </p>
+      <div class="toc">
+        <a href="#collect">1. What information do we collect?</a>
+        <a href="#processing">2. How do we process your information?</a>
+        <a href="#sharing">3. When and with whom do we share your information?</a>
+        <a href="#cookies">4. Cookies and tracking technologies</a>
+        <a href="#retention">5. How long do we keep your information?</a>
+        <a href="#security">6. How do we keep your information safe?</a>
+        <a href="#minors">7. Do we collect information from minors?</a>
+        <a href="#rights">8. What are your privacy rights?</a>
+        <a href="#contact">12. How can you contact us?</a>
+      </div>
+    </section>
+
+    <section class="section" id="collect">
+      <h2>1. What information do we collect?</h2>
+      <p>
+        We collect personal information that you voluntarily provide to us when you register on
+        the Services, express interest in obtaining information, participate in activities, or contact us.
+      </p>
+      <p>
+        The personal information collected may include names, phone numbers, email addresses,
+        usernames, passwords, contact preferences, billing addresses, and payment data when you
+        purchase services.
+      </p>
+      <p>
+        We do not process sensitive information. Payment data is handled by third-party payment
+        providers, and Kongo does not directly store sensitive banking information.
+      </p>
+      <div class="note">
+        Application data may include geolocation information, mobile device access permissions,
+        device identifiers, operating system details, and technical usage information needed for
+        security, troubleshooting, analytics, and internal reporting.
+      </div>
+    </section>
+
+    <section class="section" id="processing">
+      <h2>2. How do we process your information?</h2>
+      <p>
+        We process your personal information to provide, improve, and administer our Services,
+        communicate with you, maintain security, prevent fraud, and comply with legal obligations.
+      </p>
+      <ul>
+        <li>Facilitate account creation and authentication</li>
+        <li>Deliver and manage transport services</li>
+        <li>Respond to support requests</li>
+        <li>Send administrative information and updates</li>
+        <li>Manage orders, payments, and exchanges</li>
+        <li>Request feedback</li>
+        <li>Send marketing communications when permitted</li>
+        <li>Protect our Services and detect fraud</li>
+        <li>Evaluate and improve our products and user experience</li>
+      </ul>
+    </section>
+
+    <section class="section" id="sharing">
+      <h2>3. When and with whom do we share your personal information?</h2>
+      <p>
+        We may share your information with third-party vendors, service providers, consultants,
+        affiliates, business partners, and in connection with business transfers or acquisitions.
+      </p>
+      <p>
+        The categories of third parties may include data analytics services, cloud computing
+        services, data storage providers, payment processors, performance monitoring tools,
+        authentication services, and website hosting providers.
+      </p>
+      <p>
+        When we use Google Maps Platform APIs, we may share information needed for route
+        display, bus localization, GPS tracking, trip-related information, and similar location-based
+        services. Google Maps may use GPS, Wi-Fi, and cell towers to estimate your location.
+      </p>
+    </section>
+
+    <section class="section" id="cookies">
+      <h2>4. Do we use cookies and other tracking technologies?</h2>
+      <p>
+        We may use cookies and similar tracking technologies, including web beacons and pixels,
+        to maintain security, improve site functions, store preferences, and provide analytics and
+        advertising services.
+      </p>
+      <p>
+        We may share information with Google Analytics to understand how the Services are used.
+        You can opt out of tracking across Services by visiting the Google Analytics opt-out page.
+      </p>
+    </section>
+
+    <section class="section" id="retention">
+      <h2>5. How long do we keep your information?</h2>
+      <p>
+        We keep personal information only for as long as necessary to fulfill the purposes outlined
+        in this Privacy Notice, unless a longer retention period is required by law.
+      </p>
+      <p>
+        When there is no ongoing legitimate business need, we delete or anonymize data, or secure
+        it in isolated storage until deletion is possible.
+      </p>
+    </section>
+
+    <section class="section" id="security">
+      <h2>6. How do we keep your information safe?</h2>
+      <p>
+        We implement reasonable technical and organizational measures to protect personal
+        information. However, no system can be guaranteed to be 100% secure, and transmission
+        of information over the Internet remains at your own risk.
+      </p>
+    </section>
+
+    <section class="section" id="minors">
+      <h2>7. Do we collect information from minors?</h2>
+      <p>
+        We do not knowingly collect data from or market to minors. Kongo services are intended
+        for individuals aged 18 and above. If a minor needs to travel, the booking must be made by
+        a parent, legal guardian, or responsible adult in accordance with applicable transport rules.
+      </p>
+    </section>
+
+    <section class="section" id="rights">
+      <h2>8. What are your privacy rights?</h2>
+      <p>
+        Depending on your location, you may have the right to review, correct, delete, or update
+        your personal information, or withdraw consent for processing.
+      </p>
+      <p>
+        You may also manage your account settings directly or contact us to terminate your account.
+        We may retain some information to prevent fraud, troubleshoot issues, enforce legal terms,
+        or comply with applicable requirements.
+      </p>
+    </section>
+
+    <section class="section" id="contact">
+      <h2>12. How can you contact us about this notice?</h2>
+      <p>
+        If you have questions or comments about this notice, you may email us at
+        <strong>contact_kongo@kongoapp.com</strong> or contact us by post at:
+      </p>
+      <p>
+        kongo<br />
+        63 Ave Colonel Mondjiba, Bâtiment phase 3, Bureau B04<br />
+        Kinshasa, Democratic Republic of the Congo
+      </p>
+    </section>
+
+    <p class="footer">
+      Last updated: July 09, 2026
+    </p>
+  </main>
+</body>
+</html>

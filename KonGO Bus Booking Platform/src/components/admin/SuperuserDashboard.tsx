@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Building2, Bus, Map, Ticket, Users, X, Plus, Loader2,
-  ChevronRight, TrendingUp, Globe, Shield, RefreshCw, Eye, LogOut
+  ChevronRight, TrendingUp, Globe, Shield, RefreshCw, Eye, LogOut, Edit, Image as ImageIcon, ExternalLink, MapPin
 } from 'lucide-react';
 import { BookingDetailModal } from './BookingDetailModal';
 import { supabase } from '../../lib/supabase';
@@ -16,6 +16,7 @@ interface AgencyDetail {
   contact_email: string | null;
   contact_phone: string | null;
   address: string | null;
+  logo_url: string | null;
   rating: number;
   created_at: string;
   bus_count?: number;
@@ -41,13 +42,17 @@ export function SuperuserDashboard() {
   const [stats, setStats] = useState<GlobalStats>({ agencies: 0, buses: 0, trips: 0, bookings: 0, clients: 0, drivers: 0 });
   const [agencies, setAgencies] = useState<AgencyDetail[]>([]);
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
+  const [agencyAdmins, setAgencyAdmins] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAgencyFormOpen, setIsAgencyFormOpen] = useState(false);
   const [isAdminFormOpen, setIsAdminFormOpen] = useState(false);
+  const [editingAgency, setEditingAgency] = useState<any>(null);
+  const [editingAdmin, setEditingAdmin] = useState<any>(null);
   const [drilldown, setDrilldown] = useState<DrilldownModal>({ open: false, type: null, data: [] });
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'agencies' | 'admins'>('overview');
 
   const fetchData = useCallback(async (refresh = false) => {
     if (refresh) setIsRefreshing(true);
@@ -108,6 +113,14 @@ export function SuperuserDashboard() {
         .limit(8);
       setRecentBookings(bks || []);
 
+      // Fetch agency admins (profiles with role=agency)
+      const { data: adminProfiles } = await supabase
+        .from('profiles')
+        .select('*, agencies(name)')
+        .eq('role', 'agency')
+        .order('full_name');
+      setAgencyAdmins(adminProfiles || []);
+
     } catch (e) {
       console.error(e);
     } finally {
@@ -118,6 +131,12 @@ export function SuperuserDashboard() {
 
   useEffect(() => {
     fetchData();
+
+    // Listen for custom events to refresh data
+    const refreshHandler = () => fetchData(true);
+    window.addEventListener('refresh-agencies', refreshHandler);
+    window.addEventListener('refresh-admins', refreshHandler);
+
     // Realtime subscription on bookings
     const channel = supabase
       .channel('superuser-bookings')
@@ -126,7 +145,12 @@ export function SuperuserDashboard() {
         fetchData(true);
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    return () => { 
+      supabase.removeChannel(channel); 
+      window.removeEventListener('refresh-agencies', refreshHandler);
+      window.removeEventListener('refresh-admins', refreshHandler);
+    };
   }, [fetchData]);
 
   const openDrilldown = async (type: 'agencies' | 'buses' | 'trips' | 'bookings') => {
@@ -184,7 +208,7 @@ export function SuperuserDashboard() {
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto">
+    <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto pb-32">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -251,117 +275,315 @@ export function SuperuserDashboard() {
         ))}
       </div>
 
-      {/* Agences Table */}
-      <div className="card-elevated p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-h4 text-kongo-black font-bold">Agences Enregistrées</h2>
-          <button onClick={() => openDrilldown('agencies')} className="text-body-small text-kongo-lime font-bold flex items-center gap-1 hover:underline">
-            Voir tout <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="text-left border-b border-border-primary">
-                <th className="pb-3 text-label text-tertiary font-medium">Agence</th>
-                <th className="pb-3 text-label text-tertiary font-medium text-center">Bus</th>
-                <th className="pb-3 text-label text-tertiary font-medium text-center">Voyages</th>
-                <th className="pb-3 text-label text-tertiary font-medium hidden md:table-cell">Contact</th>
-                <th className="pb-3 text-label text-tertiary font-medium hidden md:table-cell">Note</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-secondary">
-              {agencies.length === 0 ? (
-                <tr><td colSpan={5} className="py-8 text-center text-tertiary text-body-small">Aucune agence enregistrée.</td></tr>
-              ) : agencies.map((ag) => (
-                <tr key={ag.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-kongo-black flex items-center justify-center text-kongo-lime font-black text-xs">
-                        {ag.name.slice(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-body font-semibold text-kongo-black">{ag.name}</p>
-                        <p className="text-xs text-tertiary hidden sm:block">{ag.address || '—'}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 text-center">
-                    <span className="inline-flex items-center gap-1 bg-lime-50 text-lime-700 px-2 py-1 rounded-lg text-body-small font-bold">
-                      <Bus className="w-3 h-3" /> {ag.bus_count}
-                    </span>
-                  </td>
-                  <td className="py-4 text-center">
-                    <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-lg text-body-small font-bold">
-                      <Map className="w-3 h-3" /> {ag.trip_count}
-                    </span>
-                  </td>
-                  <td className="py-4 hidden md:table-cell">
-                    <p className="text-body-small text-secondary">{ag.contact_email || ag.contact_phone || '—'}</p>
-                  </td>
-                  <td className="py-4 hidden md:table-cell">
-                    <div className="flex items-center gap-1">
-                      <span className="text-yellow-400">★</span>
-                      <span className="text-body-small font-bold">{ag.rating || '—'}</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Tabs */}
+      <div className="flex border-b border-border-primary overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`px-6 py-3 font-bold text-body-small transition-colors border-b-2 ${activeTab === 'overview' ? 'border-kongo-lime text-kongo-lime' : 'border-transparent text-tertiary hover:text-kongo-black'}`}
+        >
+          Vue d'Ensemble
+        </button>
+        <button
+          onClick={() => setActiveTab('agencies')}
+          className={`px-6 py-3 font-bold text-body-small transition-colors border-b-2 ${activeTab === 'agencies' ? 'border-kongo-lime text-kongo-lime' : 'border-transparent text-tertiary hover:text-kongo-black'}`}
+        >
+          Gestion des Agences
+        </button>
+        <button
+          onClick={() => setActiveTab('admins')}
+          className={`px-6 py-3 font-bold text-body-small transition-colors border-b-2 ${activeTab === 'admins' ? 'border-kongo-lime text-kongo-lime' : 'border-transparent text-tertiary hover:text-kongo-black'}`}
+        >
+          Comptes Agences
+        </button>
       </div>
 
-      {/* Réservations Récentes */}
-      <div className="card-elevated p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-h4 text-kongo-black font-bold flex items-center gap-2">
-            <Ticket className="w-5 h-5 text-purple-500" /> Réservations en Temps Réel
-          </h2>
-          <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold animate-pulse">● Live</span>
-        </div>
-        <div className="space-y-3">
-          {recentBookings.length === 0 ? (
-            <p className="text-center text-tertiary py-8 text-body-small">Aucune réservation pour l'instant.</p>
-          ) : recentBookings.map((b) => (
-            <motion.div
-              key={b.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-kongo-black text-kongo-lime flex items-center justify-center text-xs font-black">
-                  {b.booking_code?.slice(0, 3) || 'KG'}
-                </div>
-                <div>
-                  <p className="text-body font-semibold">{b.booking_code}</p>
-                  <p className="text-xs text-tertiary">
-                    {b.trips?.origin?.name} → {b.trips?.destination?.name} • {b.trips?.agencies?.name} • {getTimeAgo(b.created_at)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className={`text-xs px-2 py-1 rounded-full font-bold ${getStatusBadge(b.status)}`}>
-                  {b.status}
-                </span>
-                <span className="text-body-small font-bold text-kongo-black hidden sm:block">
-                  {b.total_price?.toLocaleString('fr-CD')} CDF
-                </span>
-                <button 
-                  onClick={() => {
-                    setSelectedBooking(b);
-                    setIsDetailOpen(true);
-                  }}
-                  className="p-2 hover:bg-gray-100 rounded-lg text-secondary transition-colors"
-                >
-                  <Eye className="w-4 h-4" />
+      <AnimatePresence mode="wait">
+        {activeTab === 'overview' && (
+          <motion.div
+            key="overview"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            className="space-y-8"
+          >
+            {/* Agences Table (Brief) */}
+            <div className="card-elevated p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-h4 text-kongo-black font-bold">Agences Partenaires</h2>
+                <button onClick={() => setActiveTab('agencies')} className="text-body-small text-kongo-lime font-bold flex items-center gap-1 hover:underline">
+                  Gérer tout <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-left border-b border-border-primary">
+                      <th className="pb-3 text-label text-tertiary font-medium">Agence</th>
+                      <th className="pb-3 text-label text-tertiary font-medium text-center">Flotte</th>
+                      <th className="pb-3 text-label text-tertiary font-medium text-center">Voyages</th>
+                      <th className="pb-3 text-label text-tertiary font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-secondary">
+                    {agencies.slice(0, 5).map((ag) => (
+                      <tr key={ag.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-surface-secondary border border-border-primary flex items-center justify-center overflow-hidden">
+                              {ag.logo_url ? (
+                                <img src={ag.logo_url} alt={ag.name} className="w-full h-full object-contain p-1" />
+                              ) : (
+                                <span className="text-kongo-black font-black text-xs">{ag.name.slice(0, 2).toUpperCase()}</span>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-body font-semibold text-kongo-black">{ag.name}</p>
+                              <p className="text-xs text-tertiary">{ag.address || 'Siège non défini'}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 text-center">
+                          <span className="text-body-small font-bold">{ag.bus_count} bus</span>
+                        </td>
+                        <td className="py-4 text-center">
+                          <span className="text-body-small font-bold">{ag.trip_count}</span>
+                        </td>
+                        <td className="py-4 text-right">
+                          <button
+                            onClick={() => { setEditingAgency(ag); setIsAgencyFormOpen(true); }}
+                            className="p-2 hover:bg-lime-50 text-kongo-lime rounded-lg transition-colors"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Réservations Récentes */}
+            <div className="card-elevated p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-h4 text-kongo-black font-bold flex items-center gap-2">
+                  <Ticket className="w-5 h-5 text-purple-500" /> Flux de Réservations Live
+                </h2>
+                <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold animate-pulse">● Connecté</span>
+              </div>
+              <div className="space-y-3">
+                {recentBookings.length === 0 ? (
+                  <p className="text-center text-tertiary py-8 text-body-small">Aucune réservation pour l'instant.</p>
+                ) : recentBookings.map((b) => (
+                  <div
+                    key={b.id}
+                    className="flex items-center justify-between p-4 bg-surface-secondary rounded-xl hover:bg-surface-primary transition-all border border-transparent hover:border-border-primary"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-kongo-black text-kongo-lime flex items-center justify-center text-xs font-black shadow-lg">
+                        {b.booking_code?.slice(0, 3) || 'KG'}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-body font-bold text-kongo-black">{b.booking_code}</p>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter ${getStatusBadge(b.status)}`}>
+                            {b.status}
+                          </span>
+                        </div>
+                        <p className="text-xs text-tertiary">
+                          {b.trips?.origin?.name} → {b.trips?.destination?.name} • <span className="font-bold text-secondary">{b.trips?.agencies?.name}</span> • {getTimeAgo(b.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right hidden sm:block">
+                        <p className="text-body-small font-black text-kongo-black">
+                          {b.total_price?.toLocaleString('fr-CD')} CDF
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setSelectedBooking(b);
+                          setIsDetailOpen(true);
+                        }}
+                        className="w-8 h-8 flex items-center justify-center hover:bg-white rounded-lg text-secondary transition-all shadow-sm"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'agencies' && (
+          <motion.div
+            key="agencies-tab"
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            className="space-y-6"
+          >
+            <div className="card-elevated p-0 overflow-hidden">
+              <div className="p-6 border-b border-border-primary bg-surface-secondary flex items-center justify-between">
+                <div>
+                  <h2 className="text-h4 font-bold text-kongo-black">Répertoire des Agences</h2>
+                  <p className="text-body-small text-tertiary text-sm">Gestion complète des partenaires et de leur identité visuelle.</p>
+                </div>
+                <button
+                  onClick={() => { setEditingAgency(null); setIsAgencyFormOpen(true); }}
+                  className="btn-primary px-4 py-2 rounded-lg flex items-center gap-2 font-bold"
+                >
+                  <Plus className="w-4 h-4" /> Ajouter
+                </button>
+              </div>
+              <div className="p-0">
+                <table className="w-full">
+                  <thead className="bg-surface-secondary/50">
+                    <tr className="text-left border-b border-border-primary">
+                      <th className="px-6 py-4 text-label text-tertiary font-bold lowercase tracking-wider">Identité</th>
+                      <th className="px-6 py-4 text-label text-tertiary font-bold lowercase tracking-wider">Contact</th>
+                      <th className="px-6 py-4 text-label text-tertiary font-bold lowercase tracking-wider text-center">Flotte</th>
+                      <th className="px-6 py-4 text-label text-tertiary font-bold lowercase tracking-wider text-center">Score</th>
+                      <th className="px-6 py-4 text-label text-tertiary font-bold lowercase tracking-wider text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-secondary">
+                    {agencies.map((ag) => (
+                      <tr key={ag.id} className="hover:bg-neutral-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-white border border-border-primary flex items-center justify-center overflow-hidden shadow-sm">
+                              {ag.logo_url ? (
+                                <img src={ag.logo_url} alt={ag.name} className="w-full h-full object-contain p-2" />
+                              ) : (
+                                <ImageIcon className="w-6 h-6 text-gray-200" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-black text-kongo-black">{ag.name}</p>
+                              <p className="text-xs text-tertiary flex items-center gap-1">
+                                <MapPin className="w-3 h-3" /> {ag.address || 'Non spécifié'}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="space-y-0.5">
+                            <p className="text-body-small font-bold text-secondary">{ag.contact_email || 'Pas d\'email'}</p>
+                            <p className="text-xs text-tertiary">{ag.contact_phone || 'Pas de tel'}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="inline-flex flex-col items-center">
+                            <span className="text-body font-black text-kongo-black">{ag.bus_count}</span>
+                            <span className="text-[10px] uppercase font-bold text-tertiary">Vehicules</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="text-amber-500 font-black">{ag.rating || 'N/A'}</span>
+                            <span className="text-amber-500">★</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                             <button
+                              onClick={() => { setEditingAgency(ag); setIsAgencyFormOpen(true); }}
+                              className="w-10 h-10 rounded-full hover:bg-lime-50 text-kongo-lime flex items-center justify-center transition-colors"
+                              title="Modifier"
+                            >
+                              <Edit className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => window.open(`/agencies/${ag.id}`, '_blank')}
+                              className="w-10 h-10 rounded-full hover:bg-gray-100 text-tertiary flex items-center justify-center transition-colors"
+                              title="Voir la page publique"
+                            >
+                              <ExternalLink className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'admins' && (
+          <motion.div
+            key="admins-tab"
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            className="space-y-6"
+          >
+            <div className="card-elevated p-0 overflow-hidden">
+              <div className="p-6 border-b border-border-primary bg-surface-secondary flex items-center justify-between">
+                <div>
+                  <h2 className="text-h4 font-bold text-kongo-black">Administrateurs d'Agences</h2>
+                  <p className="text-body-small text-tertiary text-sm">Gestion des comptes utilisateurs ayant des privilèges agence.</p>
+                </div>
+                <button
+                  onClick={() => { setEditingAdmin(null); setIsAdminFormOpen(true); }}
+                  className="btn-primary px-4 py-2 rounded-lg flex items-center gap-2 font-bold"
+                >
+                  <Plus className="w-4 h-4" /> Nouvel Admin
+                </button>
+              </div>
+              <div className="p-0">
+                <table className="w-full">
+                  <thead className="bg-surface-secondary/50">
+                    <tr className="text-left border-b border-border-primary">
+                      <th className="px-6 py-4 text-label text-tertiary font-bold lowercase">Nom / Profil</th>
+                      <th className="px-6 py-4 text-label text-tertiary font-bold lowercase">Email</th>
+                      <th className="px-6 py-4 text-label text-tertiary font-bold lowercase">Agence</th>
+                      <th className="px-6 py-4 text-label text-tertiary font-bold lowercase text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-secondary">
+                    {agencyAdmins.length === 0 ? (
+                      <tr><td colSpan={4} className="py-20 text-center text-tertiary">Aucun administrateur d'agence trouvé.</td></tr>
+                    ) : agencyAdmins.map((admin) => (
+                      <tr key={admin.id} className="hover:bg-neutral-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-surface-secondary flex items-center justify-center font-bold text-kongo-black border border-border-primary">
+                              {admin.full_name?.slice(0, 1).toUpperCase() || 'U'}
+                            </div>
+                            <p className="font-bold text-kongo-black">{admin.full_name || 'Utilisateur sans nom'}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-body-small text-secondary">{admin.email}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-black">
+                            {admin.agencies?.name || 'Non rattaché'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => { setEditingAdmin(admin); setIsAdminFormOpen(true); }}
+                            className="w-10 h-10 rounded-lg hover:bg-lime-50 text-kongo-lime flex items-center justify-center transition-colors ml-auto"
+                          >
+                            <Edit className="w-5 h-5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <BookingDetailModal 
         booking={selectedBooking} 
@@ -475,8 +697,16 @@ export function SuperuserDashboard() {
         )}
       </AnimatePresence>
 
-      <AddAgencyForm isOpen={isAgencyFormOpen} onClose={() => { setIsAgencyFormOpen(false); fetchData(true); }} />
-      <AddAgencyAdminForm isOpen={isAdminFormOpen} onClose={() => { setIsAdminFormOpen(false); fetchData(true); }} />
+      <AddAgencyForm 
+        isOpen={isAgencyFormOpen} 
+        onClose={() => { setIsAgencyFormOpen(false); setEditingAgency(null); fetchData(true); }} 
+        initialData={editingAgency}
+      />
+      <AddAgencyAdminForm 
+        isOpen={isAdminFormOpen} 
+        onClose={() => { setIsAdminFormOpen(false); setEditingAdmin(null); fetchData(true); }} 
+        initialData={editingAdmin}
+      />
     </div>
   );
 }

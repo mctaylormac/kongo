@@ -7,7 +7,7 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
-import { Loader2, Bus, Train, Wifi, Wind, Zap, Coffee, Shield, Clock, MapPin, Calendar } from 'lucide-react';
+import { Loader2, Bus, Train, Wifi, Wind, Zap, Coffee, Shield, Clock, MapPin, Calendar, Image as ImageIcon, Globe } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
 
 const AMENITIES_OPTIONS = [
@@ -28,14 +28,52 @@ interface BaseFormProps {
     sites?: any[]; // Sites pour le personnel
 }
 
-export function AddAgencyForm({ isOpen, onClose }: BaseFormProps) {
+export function AddAgencyForm({ isOpen, onClose, initialData }: BaseFormProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
         email: '',
-        address: ''
+        address: '',
+        logoUrl: ''
     });
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+
+    useEffect(() => {
+        if (initialData) {
+            setFormData({
+                name: initialData.name || '',
+                phone: initialData.contact_phone || '',
+                email: initialData.contact_email || '',
+                address: initialData.address || '',
+                logoUrl: initialData.logo_url || ''
+            });
+        } else {
+            setFormData({
+                name: '',
+                phone: '',
+                email: '',
+                address: '',
+                logoUrl: ''
+            });
+            setLogoFile(null);
+        }
+    }, [initialData, isOpen]);
+
+    const handleFileUpload = async (file: File) => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `logos/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+            .from('agencies')
+            .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data } = supabase.storage.from('agencies').getPublicUrl(filePath);
+        return data.publicUrl;
+    };
 
     const handleSave = async () => {
         if (!formData.name) {
@@ -45,18 +83,45 @@ export function AddAgencyForm({ isOpen, onClose }: BaseFormProps) {
 
         setIsLoading(true);
         try {
-            const { error } = await supabase
-                .from('agencies')
-                .insert([{
-                    name: formData.name,
-                    contact_phone: formData.phone,
-                    contact_email: formData.email,
-                    address: formData.address
-                }]);
+            let finalLogoUrl = formData.logoUrl;
+            
+            if (logoFile) {
+                toast.loading("Téléchargement du logo...", { id: 'upload' });
+                try {
+                   finalLogoUrl = await handleFileUpload(logoFile);
+                   toast.success("Logo téléchargé !", { id: 'upload' });
+                } catch (e: any) {
+                   toast.error("Erreur lors de l'upload: " + e.message, { id: 'upload' });
+                   setIsLoading(false);
+                   return;
+                }
+            }
+
+            const agencyData = {
+                name: formData.name,
+                contact_phone: formData.phone,
+                contact_email: formData.email,
+                address: formData.address,
+                logo_url: finalLogoUrl
+            };
+
+            let error;
+            if (initialData?.id) {
+                const { error: updateError } = await supabase
+                    .from('agencies')
+                    .update(agencyData)
+                    .eq('id', initialData.id);
+                error = updateError;
+            } else {
+                const { error: insertError } = await supabase
+                    .from('agencies')
+                    .insert([agencyData]);
+                error = insertError;
+            }
 
             if (error) throw error;
 
-            toast.success("✅ Agence enregistrée");
+            toast.success(initialData ? "✅ Agence mise à jour" : "✅ Agence enregistrée");
             onClose();
             window.dispatchEvent(new CustomEvent('refresh-agencies'));
         } catch (error: any) {
@@ -71,9 +136,9 @@ export function AddAgencyForm({ isOpen, onClose }: BaseFormProps) {
             <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
                 <div className="p-6 pb-2">
                     <DialogHeader>
-                        <DialogTitle>Ajouter une Agence</DialogTitle>
+                        <DialogTitle>{initialData ? "Modifier l'Agence" : "Ajouter une Agence"}</DialogTitle>
                         <DialogDescription>
-                            Créez un nouveau partenaire de transport sur la plateforme.
+                            {initialData ? "Mettez à jour les informations de votre partenaire." : "Créez un nouveau partenaire de transport sur la plateforme."}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -118,6 +183,65 @@ export function AddAgencyForm({ isOpen, onClose }: BaseFormProps) {
                                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                             />
                         </div>
+                        <div className="grid gap-2 border-t pt-4 mt-2">
+                            <Label className="text-kongo-black flex items-center gap-2">
+                                <ImageIcon className="w-4 h-4 text-kongo-lime" />
+                                Branding Agence (Image / Logo)
+                            </Label>
+                            
+                            <div className="flex flex-col gap-3">
+                                <div className="flex items-center gap-3">
+                                    <Input
+                                        id="agency-logo-file"
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) setLogoFile(file);
+                                        }}
+                                        className="cursor-pointer h-10 py-1"
+                                    />
+                                    {logoFile && (
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            onClick={() => setLogoFile(null)}
+                                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                        >
+                                            Effacer
+                                        </Button>
+                                    )}
+                                </div>
+                                
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                        <Globe className="w-4 h-4 text-tertiary" />
+                                    </div>
+                                    <Input
+                                        id="agency-logo"
+                                        placeholder="Ou entrez une URL https://..."
+                                        className="pl-10"
+                                        value={formData.logoUrl}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, logoUrl: e.target.value });
+                                            if (e.target.value) setLogoFile(null); // Clear file if URL provided
+                                        }}
+                                    />
+                                </div>
+                            </div>
+
+                            {(logoFile || formData.logoUrl) && (
+                                <div className="mt-2 h-32 w-full rounded-xl border border-dashed border-border-primary overflow-hidden bg-surface-secondary flex flex-col items-center justify-center p-3">
+                                    <p className="text-[10px] text-tertiary uppercase font-bold mb-2">Aperçu du Branding</p>
+                                    <img 
+                                        src={logoFile ? URL.createObjectURL(logoFile) : formData.logoUrl} 
+                                        alt="Brainding Agence" 
+                                        className="h-20 object-contain" 
+                                        onError={(e) => (e.currentTarget.style.display = 'none')} 
+                                    />
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <div className="p-6 pt-2">
@@ -129,7 +253,7 @@ export function AddAgencyForm({ isOpen, onClose }: BaseFormProps) {
                             className="bg-kongo-black text-white hover:bg-kongo-black/90"
                         >
                             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Enregistrer l'Agence
+                            {initialData ? "Mettre à jour" : "Enregistrer l'Agence"}
                         </Button>
                     </DialogFooter>
                 </div>
@@ -138,7 +262,7 @@ export function AddAgencyForm({ isOpen, onClose }: BaseFormProps) {
     );
 }
 
-export function AddAgencyAdminForm({ isOpen, onClose }: BaseFormProps) {
+export function AddAgencyAdminForm({ isOpen, onClose, initialData }: BaseFormProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [agencies, setAgencies] = useState<any[]>([]);
     const [formData, setFormData] = useState({
@@ -149,6 +273,24 @@ export function AddAgencyAdminForm({ isOpen, onClose }: BaseFormProps) {
     });
 
     useEffect(() => {
+        if (initialData) {
+            setFormData({
+                agencyId: initialData.agency_id || '',
+                email: initialData.email || '',
+                password: '', // Password remains empty unless changing? Auth update is complex.
+                fullName: initialData.full_name || ''
+            });
+        } else {
+            setFormData({
+                agencyId: '',
+                email: '',
+                password: '',
+                fullName: ''
+            });
+        }
+    }, [initialData, isOpen]);
+
+    useEffect(() => {
         const fetchAgencies = async () => {
             const { data } = await supabase.from('agencies').select('id, name');
             if (data) setAgencies(data);
@@ -157,40 +299,90 @@ export function AddAgencyAdminForm({ isOpen, onClose }: BaseFormProps) {
     }, [isOpen]);
 
     const handleSave = async () => {
-        if (!formData.email || !formData.password || !formData.fullName) {
+        if (!formData.email || !formData.fullName || !formData.agencyId) {
             toast.error("Veuillez remplir tous les champs obligatoires");
+            return;
+        }
+
+        if (!initialData && !formData.password) {
+            toast.error("Le mot de passe est requis pour un nouveau compte");
             return;
         }
 
         setIsLoading(true);
         try {
-            // Fetch current session to restore it later
-            const { data: { session } } = await supabase.auth.getSession();
+            if (initialData) {
+                // Update profile only
+                console.log("Updating admin profile:", initialData.id, "to agency:", formData.agencyId);
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .update({
+                        full_name: formData.fullName,
+                        agency_id: formData.agencyId,
+                        role: 'agency'
+                    })
+                    .eq('id', initialData.id);
 
-            // Register the account (role is user by default and agency_id is empty as requested)
-            const { error } = await supabase.auth.signUp({
-              email: formData.email,
-              password: formData.password,
-              options: {
-                data: {
-                  full_name: formData.fullName,
-                  role: 'user',
-                  agency_id: null
-                }
-              }
-            });
+                if (profileError) throw profileError;
+                
+                // Also update session metadata locally if possible or just rely on DB
+                toast.success(`✅ Profil administrateur d'agence mis à jour !`);
+            } else {
+                // Fetch current session to restore it later
+                const { data: { session } } = await supabase.auth.getSession();
 
-            // Restore the admin session immediately to avoid logging them out
-            if (session) {
-                await supabase.auth.setSession({
-                    access_token: session.access_token,
-                    refresh_token: session.refresh_token
+                // Register the account
+                const { data: authData, error: authError } = await supabase.auth.signUp({
+                  email: formData.email,
+                  password: formData.password,
+                  options: {
+                    data: {
+                      full_name: formData.fullName,
+                      role: 'agency', // ENSURE role is agency in auth metadata
+                      agency_id: formData.agencyId
+                    }
+                  }
                 });
+
+                if (authError) throw authError;
+
+                // Sync profile - ensure role is agency and agency_id is correctly set
+                if (authData.user) {
+                    const { error: syncError } = await supabase
+                        .from('profiles')
+                        .upsert({
+                            id: authData.user.id,
+                            email: formData.email,
+                            role: 'agency', 
+                            agency_id: formData.agencyId,
+                            full_name: formData.fullName
+                        });
+                    
+                    if (syncError) {
+                        console.error("Profile sync error:", syncError);
+                        // Try update if upsert fails
+                        await supabase
+                            .from('profiles')
+                            .update({
+                                role: 'agency',
+                                agency_id: formData.agencyId,
+                                full_name: formData.fullName
+                            })
+                            .eq('id', authData.user.id);
+                    }
+                }
+                
+                // Restore the admin session immediately to avoid logging them out
+                if (session) {
+                    await supabase.auth.setSession({
+                        access_token: session.access_token,
+                        refresh_token: session.refresh_token
+                    });
+                }
+                
+                toast.success("✅ Compte administrateur d'agence créé !");
             }
 
-            if (error) throw error;
-
-            toast.success("✅ Compte administrateur créé avec succès (Rôle: Utilisateur) !");
             onClose();
             window.dispatchEvent(new CustomEvent('refresh-admins'));
         } catch (error: any) {
@@ -204,12 +396,32 @@ export function AddAgencyAdminForm({ isOpen, onClose }: BaseFormProps) {
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="sm:max-w-[450px]">
                 <DialogHeader>
-                    <DialogTitle>Créer un Compte Administrateur</DialogTitle>
+                    <DialogTitle>{initialData ? "Modifier le Compte" : "Créer un Compte Agence"}</DialogTitle>
                     <DialogDescription>
-                        Créez un nouvel accès administrateur de plateforme.
+                        {initialData 
+                            ? "Mettez à jour les informations du compte administrateur d'agence."
+                            : "Créez un nouvel accès administrateur lié à une agence spécifique."}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                        <Label>Agence associée</Label>
+                        <Select
+                            value={formData.agencyId}
+                            onValueChange={(v) => setFormData({ ...formData, agencyId: v })}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Sélectionner l'agence" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {agencies.map(agency => (
+                                    <SelectItem key={agency.id} value={agency.id}>
+                                        {agency.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <div className="grid gap-2">
                         <Label>Nom Complet</Label>
                         <Input
@@ -224,24 +436,27 @@ export function AddAgencyAdminForm({ isOpen, onClose }: BaseFormProps) {
                             type="email"
                             placeholder="admin@agence.cd"
                             value={formData.email}
+                            disabled={!!initialData} // Email is usually fixed in auth
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         />
                     </div>
-                    <div className="grid gap-2">
-                        <Label>Mot de passe</Label>
-                        <Input
-                            type="password"
-                            placeholder="********"
-                            value={formData.password}
-                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        />
-                    </div>
+                    {!initialData && (
+                        <div className="grid gap-2">
+                            <Label>Mot de passe</Label>
+                            <Input
+                                type="password"
+                                placeholder="********"
+                                value={formData.password}
+                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            />
+                        </div>
+                    )}
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose} disabled={isLoading}>Annuler</Button>
-                    <Button onClick={handleSave} disabled={isLoading} className="bg-kongo-black text-white">
+                    <Button onClick={handleSave} disabled={isLoading} className="bg-kongo-black text-white hover:bg-kongo-black/90 font-bold">
                         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Créer le compte
+                        {initialData ? "Mettre à jour" : "Créer le compte"}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -596,7 +811,7 @@ export function AddStaffForm({ isOpen, onClose, agencyId, sites, initialData }: 
             if (initialData) {
                 setFormData({
                     name: initialData.full_name || '',
-                    phone: initialData.phone || '',
+                    phone: initialData.phone || initialData.phone_number || '',
                     email: initialData.email || '',
                     role: initialData.role || 'cashier',
                     password: '', // On ne pré-remplit pas le mot de passe
@@ -632,6 +847,22 @@ export function AddStaffForm({ isOpen, onClose, agencyId, sites, initialData }: 
 
         setIsLoading(true);
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            let finalAgencyId = agencyId;
+            
+            // If agencyId not provided via props, try to get it from logged in user
+            if (!finalAgencyId && user) {
+                finalAgencyId = user.user_metadata?.agency_id;
+                if (!finalAgencyId) {
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('agency_id')
+                        .eq('id', user.id)
+                        .single();
+                    finalAgencyId = profile?.agency_id;
+                }
+            }
+
             if (initialData) {
                 // UPDATE MODE
                 const { error } = await supabase
@@ -639,8 +870,9 @@ export function AddStaffForm({ isOpen, onClose, agencyId, sites, initialData }: 
                     .update({
                         full_name: formData.name,
                         role: formData.role,
-                        site_id: formData.siteId || null,
+                        site_id: (formData.siteId === 'none' || !formData.siteId) ? null : formData.siteId,
                         phone_number: formData.phone,
+                        license_number: formData.role === 'driver' ? formData.licenseNumber : null
                     })
                     .eq('id', initialData.id);
 
@@ -649,27 +881,9 @@ export function AddStaffForm({ isOpen, onClose, agencyId, sites, initialData }: 
                 toast.success("✅ Profil mis à jour");
             } else {
                 // CREATE MODE (Sign up)
-                // Fetch current session to restore it later
-                const { data: { session } } = await supabase.auth.getSession();
-                const { data: { user } } = await supabase.auth.getUser();
-                
-                let finalAgencyId = agencyId;
-                
-                // If agencyId not provided via props, try to get it from metadata or profile
-                if (!finalAgencyId && user) {
-                    finalAgencyId = user.user_metadata?.agency_id;
-                    
-                    if (!finalAgencyId) {
-                        const { data: profile } = await supabase
-                            .from('profiles')
-                            .select('agency_id')
-                            .eq('id', user.id)
-                            .single();
-                        finalAgencyId = profile?.agency_id;
-                    }
-                }
+                const { data: { session: currentSession } } = await supabase.auth.getSession();
 
-                const { error } = await supabase.auth.signUp({
+                const { data: authData, error: authError } = await supabase.auth.signUp({
                     email: formData.email,
                     password: formData.password,
                     options: {
@@ -679,25 +893,44 @@ export function AddStaffForm({ isOpen, onClose, agencyId, sites, initialData }: 
                             agency_id: finalAgencyId || null,
                             site_id: formData.siteId || null,
                             phone: formData.phone,
+                            license_number: formData.role === 'driver' ? formData.licenseNumber : null
                         }
                     }
                 });
 
-                // Restore session
-                if (session) {
-                    await supabase.auth.setSession({
-                        access_token: session.access_token,
-                        refresh_token: session.refresh_token
-                    });
+                if (authError) throw authError;
+
+                // CRITICAL: Manually sync to profiles table to ensure EVERYTHING (especially site_id) is captured
+                if (authData.user) {
+                    const { error: profileError } = await supabase
+                        .from('profiles')
+                        .upsert({
+                            id: authData.user.id,
+                            email: formData.email,
+                            full_name: formData.name,
+                            role: formData.role,
+                            agency_id: finalAgencyId || null,
+                            site_id: (formData.siteId === 'none' || !formData.siteId) ? null : formData.siteId,
+                            phone_number: formData.phone,
+                            license_number: formData.role === 'driver' ? formData.licenseNumber : null
+                        });
+                    
+                    if (profileError) console.error("Profile sync error:", profileError);
                 }
 
-                if (error) throw error;
-                toast.success("✅ Membre ajouté");
+                // Restore session to prevent logout of the admin
+                if (currentSession) {
+                    await supabase.auth.setSession({
+                        access_token: currentSession.access_token,
+                        refresh_token: currentSession.refresh_token
+                    });
+                }
+                
+                toast.success(formData.role === 'driver' ? "✅ Chauffeur ajouté" : "✅ Membre du personnel ajouté");
             }
             onClose();
             window.dispatchEvent(new CustomEvent('refresh-staff'));
-            onClose();
-            window.dispatchEvent(new CustomEvent('refresh-staff'));
+            window.dispatchEvent(new CustomEvent('refresh-drivers'));
         } catch (error: any) {
             toast.error("❌ Erreur: " + error.message);
         } finally {
@@ -710,14 +943,51 @@ export function AddStaffForm({ isOpen, onClose, agencyId, sites, initialData }: 
             <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
                 <div className="p-6 pb-2">
                     <DialogHeader>
-                        <DialogTitle>Ajouter un Membre du Personnel</DialogTitle>
+                        <DialogTitle>
+                            {initialData ? "Modifier" : "Ajouter"} {formData.role === 'driver' ? 'un Chauffeur' : 'un Membre du Personnel'}
+                        </DialogTitle>
                         <DialogDescription>
-                            Créez un compte pour un employé de votre agence.
+                            {initialData 
+                                ? "Mettez à jour les informations de votre employé." 
+                                : "Créez un compte pour un nouvel employé de votre agence."}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
                 <div className="flex-1 overflow-y-auto px-6 py-2">
                     <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="staff-role">Fonction / Rôle</Label>
+                                <Select
+                                    value={formData.role}
+                                    onValueChange={(v: string) => setFormData({ ...formData, role: v })}
+                                >
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="cashier">Caissier / Agent de vente</SelectItem>
+                                        <SelectItem value="chef">Chef d'Agence / Superviseur</SelectItem>
+                                        <SelectItem value="driver">Chauffeur / Conducteur</SelectItem>
+                                        <SelectItem value="agency">Administrateur Agence</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="staff-site">Affectation Site</Label>
+                                <Select
+                                    value={formData.siteId}
+                                    onValueChange={(v: string) => setFormData({ ...formData, siteId: v })}
+                                >
+                                    <SelectTrigger><SelectValue placeholder="Siège / Bureau" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Siège Principal</SelectItem>
+                                        {sites?.map(site => (
+                                            <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
                         <div className="grid gap-2">
                             <Label htmlFor="staff-name">Nom complet</Label>
                             <Input
@@ -727,13 +997,15 @@ export function AddStaffForm({ isOpen, onClose, agencyId, sites, initialData }: 
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             />
                         </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="staff-email">Email (Connexion)</Label>
+                                <Label htmlFor="staff-email">Email (Identifiant)</Label>
                                 <Input
                                     id="staff-email"
                                     type="email"
                                     placeholder="employe@agence.cd"
+                                    disabled={!!initialData}
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                 />
@@ -748,61 +1020,30 @@ export function AddStaffForm({ isOpen, onClose, agencyId, sites, initialData }: 
                                 />
                             </div>
                         </div>
-                        <div className="grid gap-2">
-                            <Label>Rôle assigné</Label>
-                            <Select
-                                value={formData.role}
-                                onValueChange={(v: string) => setFormData({ ...formData, role: v })}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Choisir un rôle" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="chef">Chef d'Agence</SelectItem>
-                                    <SelectItem value="cashier">Caissier / Guichetier</SelectItem>
-                                    <SelectItem value="driver">Chauffeur</SelectItem>
-                                    <SelectItem value="agency">Administrateur Secondaire</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Site / Agence physique d'affectation</Label>
-                            <Select
-                                value={formData.siteId}
-                                onValueChange={(v: string) => setFormData({ ...formData, siteId: v })}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Choisir un site (Optionnel)" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">Aucun site spécifique</SelectItem>
-                                    {sites?.map((s: any) => (
-                                        <SelectItem key={s.id} value={s.id}>{s.name} ({s.city})</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <p className="text-[10px] text-tertiary">Liez cet employé à un bureau de vente spécifique.</p>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="staff-password">Mot de passe provisoire</Label>
-                            <Input
-                                id="staff-password"
-                                type="text"
-                                placeholder="Définissez un mot de passe (min 6 car.)"
-                                value={formData.password}
-                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                            />
-                            <p className="text-[10px] text-tertiary italic">L'employé utilisera ce mot de passe pour sa première connexion.</p>
-                        </div>
+
                         {formData.role === 'driver' && (
-                            <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
-                                <Label htmlFor="staff-license">Numéro de Permis</Label>
+                            <div className="grid gap-2">
+                                <Label htmlFor="staff-license">Numéro de Permis de conduire</Label>
                                 <Input
                                     id="staff-license"
                                     placeholder="PC-XXXX-XXXX"
                                     value={formData.licenseNumber}
                                     onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
                                 />
+                            </div>
+                        )}
+
+                        {!initialData && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="staff-password">Mot de passe temporaire</Label>
+                                <Input
+                                    id="staff-password"
+                                    type="password"
+                                    placeholder="Min. 6 caractères"
+                                    value={formData.password}
+                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                />
+                                <p className="text-[10px] text-tertiary">L'employé devra changer son mot de passe à la première connexion.</p>
                             </div>
                         )}
                     </div>
@@ -816,7 +1057,7 @@ export function AddStaffForm({ isOpen, onClose, agencyId, sites, initialData }: 
                             className="bg-kongo-black text-white hover:bg-kongo-black/90 font-bold"
                         >
                             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Enregistrer le Profil
+                            {initialData ? "Sauvegarder" : "Créer le compte"}
                         </Button>
                     </DialogFooter>
                 </div>
@@ -824,6 +1065,7 @@ export function AddStaffForm({ isOpen, onClose, agencyId, sites, initialData }: 
         </Dialog>
     );
 }
+
 
 export function AddTripForm({ isOpen, onClose, agencyId, initialData }: BaseFormProps) {
     const [isLoading, setIsLoading] = useState(false);

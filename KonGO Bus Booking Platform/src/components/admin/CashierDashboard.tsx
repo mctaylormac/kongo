@@ -5,7 +5,7 @@ import {
   MapPin, Clock, CreditCard, ChevronLeft, CheckCircle2,
   Printer, User as UserIcon, Plus, Trash2, Calendar,
   Bus, Wallet, Info, AlertCircle, Loader2, X, Star, Share2, Download, Smartphone, QrCode,
-  RefreshCw, Eye, LogOut
+  RefreshCw, Eye, LogOut, BarChart3, LayoutDashboard
 } from 'lucide-react';
 import { KonGOLogo } from '../KonGOLogo';
 import { QRCodeSVG } from 'qrcode.react';
@@ -61,6 +61,8 @@ export function CashierDashboard() {
   const [activeTab, setActiveTab] = useState<'booking' | 'history'>('booking');
   const [historyBookings, setHistoryBookings] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [timeFilter, setTimeFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
+  const [upcomingTripsCount, setUpcomingTripsCount] = useState(0);
 
   useEffect(() => {
     const getAgency = async () => {
@@ -74,7 +76,22 @@ export function CashierDashboard() {
     getAgency();
     fetchClients();
     fetchAgeCategories();
-  }, []);
+  }, [agencyId]);
+
+  useEffect(() => {
+    if (agencyId) {
+      const fetchUpcomingCount = async () => {
+        const { count } = await supabase
+          .from('trips')
+          .select('*', { count: 'exact', head: true })
+          .eq('agency_id', agencyId)
+          .eq('status', 'scheduled')
+          .gt('departure_time', new Date().toISOString());
+        setUpcomingTripsCount(count || 0);
+      };
+      fetchUpcomingCount();
+    }
+  }, [agencyId]);
 
   useEffect(() => {
     if (activeTab === 'history' && cashierId) {
@@ -394,7 +411,7 @@ export function CashierDashboard() {
                   onClick={() => setActiveTab('history')}
                   className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'history' ? 'bg-kongo-lime text-kongo-black shadow-lg' : 'text-secondary hover:text-white'}`}
                 >
-                  <Clock className="w-3 h-3" /> Historique
+                  <BarChart3 className="w-3 h-3" /> Tableau de bord
                 </button>
               </div>
 
@@ -403,13 +420,13 @@ export function CashierDashboard() {
                 <p className="font-bold text-on-black text-xs uppercase tracking-widest truncate max-w-[150px]">CAISSIER PRINCIPAL</p>
               </div>
               <div className="flex items-center gap-2 border-l border-white/10 pl-4">
-                <Button size="sm" variant="ghost" className="text-error hover:bg-error/10 rounded-lg h-10 px-3" onClick={resetProcess}>
+                <Button size="sm" variant="ghost" className="btn-dark-outline h-10 px-3 text-error hover:text-error" onClick={resetProcess}>
                   <X className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">Annuler</span>
                 </Button>
                 <Button 
                   size="icon" 
                   variant="ghost" 
-                  className="text-secondary hover:text-white rounded-lg h-10 w-10 hover:bg-white/10" 
+                  className="btn-dark-outline rounded-lg h-10 w-10 px-0" 
                   onClick={async () => {
                     await supabase.auth.signOut();
                     localStorage.removeItem('kongo-app-state');
@@ -458,7 +475,7 @@ export function CashierDashboard() {
 
         <AnimatePresence mode="wait">
           
-          {/* HISTORY VIEW */}
+          {/* DASHBOARD VIEW */}
           {activeTab === 'history' && (
             <motion.div
               key="history-view"
@@ -467,23 +484,115 @@ export function CashierDashboard() {
               exit={{ opacity: 0, y: -20 }}
               className="max-w-6xl mx-auto space-y-8"
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-h2 font-black text-kongo-black">Historique des Ventes</h2>
-                  <p className="text-secondary">Liste de toutes les réservations que vous avez enregistrées aujourd'hui.</p>
-                </div>
-                <Button variant="outline" className="rounded-xl" onClick={fetchHistory} disabled={isLoadingHistory}>
-                  <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingHistory ? 'animate-spin' : ''}`} /> Actualiser
-                </Button>
-              </div>
+              {(() => {
+                const now = new Date();
+                const filteredBookings = historyBookings.filter(booking => {
+                  const bookingDate = new Date(booking.created_at);
+                  if (timeFilter === 'today') {
+                     return bookingDate.toDateString() === now.toDateString();
+                  } else if (timeFilter === 'week') {
+                     const weekAgo = new Date();
+                     weekAgo.setDate(now.getDate() - 7);
+                     return bookingDate >= weekAgo;
+                  } else if (timeFilter === 'month') {
+                     return bookingDate.getMonth() === now.getMonth() && bookingDate.getFullYear() === now.getFullYear();
+                  }
+                  return true;
+                });
 
-              {isLoadingHistory ? (
+                const totalCa = filteredBookings.reduce((sum, b) => sum + (b.total_price || 0), 0);
+                const totalTickets = filteredBookings.reduce((sum, b) => sum + (b.passenger_count || 1), 0);
+
+                return (
+                  <>
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-h2 font-black text-kongo-black">Tableau de Bord</h2>
+                        <p className="text-secondary">Aperçu de vos performances et liste de vos ventes.</p>
+                      </div>
+                      
+                      <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
+                        <div className="bg-surface-secondary rounded-xl p-1 flex shadow-inner">
+                          {['today', 'week', 'month', 'all'].map(t => (
+                            <button 
+                              key={t}
+                              onClick={() => setTimeFilter(t as any)}
+                              className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${timeFilter === t ? 'bg-white text-kongo-black shadow-sm ring-1 ring-border-primary/20' : 'text-secondary hover:text-kongo-black'}`}
+                            >
+                               {t === 'today' ? 'Aujourd\'hui' : t === 'week' ? '7 Jours' : t === 'month' ? 'Ce Mois' : 'Total'}
+                            </button>
+                          ))}
+                        </div>
+                        <Button variant="outline" className="btn-outline rounded-xl" onClick={fetchHistory} disabled={isLoadingHistory}>
+                          <RefreshCw className={`w-4 h-4 sm:mr-2 ${isLoadingHistory ? 'animate-spin' : ''}`} /> <span className="hidden sm:inline">Actualiser</span>
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* KPI CARDS */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                      <Card className="bg-kongo-black text-on-black border-none shadow-xl-strong overflow-hidden relative group">
+                         <div className="absolute -right-4 -top-4 w-32 h-32 bg-kongo-lime/10 rounded-full blur-2xl group-hover:bg-kongo-lime/20 transition-all duration-500"></div>
+                         <CardContent className="p-6 relative z-10">
+                            <div className="flex justify-between items-start">
+                               <div>
+                                  <p className="text-[10px] text-secondary opacity-70 uppercase font-black tracking-widest">Chiffre d'Affaires</p>
+                                  <h3 className="text-h2 font-black text-kongo-lime mt-1">
+                                     {new Intl.NumberFormat('fr-CD', { style: 'currency', currency: 'CDF', maximumFractionDigits: 0 }).format(totalCa)}
+                                  </h3>
+                               </div>
+                               <div className="w-12 h-12 rounded-2xl bg-kongo-lime/20 flex items-center justify-center shrink-0">
+                                  <Wallet className="w-6 h-6 text-kongo-lime" />
+                               </div>
+                            </div>
+                         </CardContent>
+                      </Card>
+                      
+                      <Card className="bg-white border-2 border-border-primary/10 shadow-lg overflow-hidden relative group">
+                         <CardContent className="p-6 relative z-10">
+                            <div className="flex justify-between items-start">
+                               <div>
+                                  <p className="text-[10px] text-secondary uppercase font-black tracking-widest">Billets Vendus</p>
+                                  <h3 className="text-h2 font-black text-kongo-black mt-1">
+                                     {totalTickets}
+                                  </h3>
+                               </div>
+                               <div className="w-12 h-12 rounded-2xl bg-surface-secondary border border-border-primary flex items-center justify-center shrink-0">
+                                  <Ticket className="w-6 h-6 text-secondary group-hover:rotate-12 transition-transform" />
+                               </div>
+                            </div>
+                         </CardContent>
+                      </Card>
+                      
+                      <Card className="bg-surface-primary border border-border-primary/20 shadow-lg overflow-hidden relative group">
+                         <CardContent className="p-6 relative z-10">
+                            <div className="flex justify-between items-start">
+                               <div>
+                                  <p className="text-[10px] text-secondary uppercase font-black tracking-widest">Voyages à venir</p>
+                                  <h3 className="text-h2 font-black text-kongo-black mt-1">
+                                     {upcomingTripsCount}
+                                  </h3>
+                               </div>
+                               <div className="w-12 h-12 rounded-2xl bg-surface-tertiary flex items-center justify-center shrink-0">
+                                  <Bus className="w-6 h-6 text-secondary group-hover:-translate-y-1 transition-transform" />
+                               </div>
+                            </div>
+                         </CardContent>
+                      </Card>
+                    </div>
+
+                    <Separator className="bg-border-primary/20" />
+                    <h3 className="text-h4 font-black flex items-center gap-2">
+                       <Clock className="w-5 h-5 text-kongo-lime" /> Liste des Réservations
+                    </h3>
+
+                    {isLoadingHistory ? (
                 <div className="py-20 flex justify-center">
                   <Loader2 className="w-12 h-12 text-kongo-lime animate-spin" />
                 </div>
-              ) : historyBookings.length > 0 ? (
+              ) : filteredBookings.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {historyBookings.map(booking => (
+                  {filteredBookings.map(booking => (
                     <Card key={booking.id} className="card-elevated border-none shadow-xl bg-white overflow-hidden group hover:scale-[1.02] transition-all">
                       <div className="bg-kongo-black p-4 text-on-black flex justify-between items-center">
                         <Badge className="bg-kongo-lime text-kongo-black font-black border-none uppercase text-[10px]">
@@ -560,6 +669,9 @@ export function CashierDashboard() {
                   </Button>
                 </div>
               )}
+            </>
+          );
+        })()}
             </motion.div>
           )}
 
@@ -706,7 +818,7 @@ export function CashierDashboard() {
               className="space-y-6"
             >
               <div className="flex items-center justify-between">
-                <Button variant="ghost" onClick={prevStep} className="text-secondary">
+                <Button variant="outline" onClick={prevStep} className="btn-outline">
                   <ChevronLeft className="mr-2 w-4 h-4" /> Retour au client
                 </Button>
                 <div className="flex items-center gap-2 text-label">
@@ -818,7 +930,7 @@ export function CashierDashboard() {
               className="space-y-8"
             >
               <div className="flex items-center justify-between">
-                <Button variant="ghost" onClick={prevStep} className="text-secondary">
+                <Button variant="outline" onClick={prevStep} className="btn-outline">
                   <ChevronLeft className="mr-2 w-4 h-4" /> Retour aux trajets
                 </Button>
                 <div className="flex items-center gap-4">
@@ -852,7 +964,7 @@ export function CashierDashboard() {
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
                     <h3 className="text-h4 font-bold">Liste des passagers</h3>
-                    <Button variant="outline" className="btn-secondary" onClick={addPassenger}>
+                    <Button className="btn-secondary" onClick={addPassenger}>
                       <Plus className="w-4 h-4 mr-2" /> Ajouter un passager
                     </Button>
                   </div>
@@ -1029,7 +1141,7 @@ export function CashierDashboard() {
                    </div>
                 </div>
                 <div className="flex gap-4">
-                  <Button variant="ghost" className="h-14 px-8 text-on-black hover:bg-surface-tertiary/20" onClick={prevStep}>
+                  <Button variant="ghost" className="h-14 px-8 btn-dark-outline" onClick={prevStep}>
                     <ChevronLeft className="w-4 h-4 mr-2" /> Retour
                   </Button>
                   <Button 
@@ -1054,7 +1166,7 @@ export function CashierDashboard() {
               className="space-y-8"
             >
               <div className="flex items-center justify-between mb-8">
-                <Button variant="ghost" onClick={prevStep} className="text-secondary">
+                <Button variant="outline" onClick={prevStep} className="btn-outline">
                   <ChevronLeft className="mr-2 w-4 h-4" /> Retour aux places
                 </Button>
                 <div className="text-right">
@@ -1159,7 +1271,7 @@ export function CashierDashboard() {
                   <div className="grid grid-cols-2 gap-4">
                     <Button 
                       variant="outline" 
-                      className="h-14 rounded-xl border-border-primary hover:bg-surface-tertiary"
+                      className="h-14 rounded-xl btn-outline"
                       onClick={prevStep}
                       disabled={isProcessing}
                     >
@@ -1321,7 +1433,7 @@ export function CashierDashboard() {
                  <Button className="h-16 btn-primary shadow-xl shadow-kongo-lime/20 uppercase tracking-widest font-black" onClick={() => window.print()}>
                     <Printer className="w-5 h-5 mr-3" /> Imprimer le ticket
                  </Button>
-                 <Button variant="outline" className="h-16 border-border-primary bg-white rounded-2xl uppercase tracking-widest font-black text-secondary hover:bg-surface-secondary" onClick={() => window.location.reload()}>
+                 <Button variant="outline" className="h-16 rounded-2xl uppercase tracking-widest font-black btn-outline" onClick={() => window.location.reload()}>
                     Nouvelle session
                  </Button>
               </div>

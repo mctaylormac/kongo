@@ -307,7 +307,7 @@ export function AdminDashboard({ onPageChange, userRole = 'superuser' }: AdminDa
                     {userRole === 'superuser' && (
                         <button
                             onClick={() => onPageChange(NAVIGATION_PAGES.ADMIN_AGENCIES)}
-                            className="w-full mt-4 flex items-center justify-center p-3 rounded-lg border border-white/20 hover:bg-white/10 transition-all font-bold text-body-small"
+                            className="btn-dark-outline w-full mt-4 flex items-center justify-center gap-2 text-sm font-bold"
                         >
                             <Building2 className="w-4 h-4 mr-2" /> Gérer les Agences
                         </button>

@@ -1,0 +1,39 @@
+SESSION : 2026-04-20T12:39 -> 12:44
+DEMANDE : Refonte du tableau de bord agence (onglet Aperçu)
+AGENT : Meta-Agent (LOKI-Orchestrator) + Agent Analytique + Agent Dev Web
+
+=== TRAVAIL EFFECTUÉ ===
+
+1. AUDIT SUPABASE
+   - Tables confirmées : bookings, ticket_scans, buses, trips, agency_sites, profiles, bus_locations
+   - ticket_scans : colonnes trip_id, scanned_at, result, scan_status utilisées pour KPI "Tickets validés"
+   - bookings : cashier_id = null → achat en ligne (Mobile/Web)
+
+2. MODIFICATIONS : kongobackoffice/src/components/admin/AgencyDashboard.tsx
+   - Ajout imports : useMemo, ScanLine, Calendar, CalendarRange, Smartphone, Monitor (lucide)
+   - Ajout import : BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell (recharts)
+   - Nouveau type StatsPeriod : 'today' | '7days' | 'month' | 'total' | 'custom'
+   - Nouveaux states : statsPeriod, customFrom, customTo, ticketScans, allBookings
+   - fetchData mis à jour : chargement de TOUTES les réservations (sans limite 50) + ticket_scans
+   - isInPeriod (useCallback) : filtre date universel en fonction de statsPeriod
+   - analyticsStats (useMemo) : revenue, tickets validés, voyages, état flotte (en voyage/panne/repos)
+   - revenuePerSite (useMemo) : agrégation CA par canal (Mobile/Web, Borne, Sites physiques)
+   - Vue Overview entièrement remplacée :
+     * Filtres temporels (Aujourd'hui / 7J / Mois / Global / Période custom)
+     * 5 KPI Cards : Agents, Flotte (avec breakdown), Voyages, Tickets, Sites
+     * Widget CA total + Panier moyen (fond sombre)
+     * Histogramme Recharts (BarChart + Cell colorisé par canal)
+     * Légende : Indigo=Mobile/Web, Ambre=Borne, Slate=Site physique
+     * Widgets compact temps réel conservés en bas : "État de la Flotte" + "Dernières Réservations"
+
+=== RÈGLES MÉTIER APPLIQUÉES ===
+- Bus "En Voyage" = GPS actif (<10min) OU trip en status 'in_progress'
+- Billet "Online" (Mobile/Web) = cashier_id IS NULL
+- Billet "Borne" = payment_method='kiosk' OU role='kiosk'
+- Billet "Site" = cashier_id non null, site_id du personnel = site enregistré
+
+=== FICHIERS MODIFIÉS ===
+- c:\web\meji\kongo\kongobackoffice\src\components\admin\AgencyDashboard.tsx
+
+=== STATUT ===
+✅ Implémentation complète. Prêt pour test en dev server.

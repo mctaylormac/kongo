@@ -1,127 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
-
-interface SearchParams {
-  from: string;
-  to: string;
-  date: string;
-  passengers: number;
-  transportType?: 'bus' | 'train' | 'all';
-  departureStopId?: string;
-  arrivalStopId?: string;
-}
-
-interface Trip {
-  id: string;
-  operator: string;
-  from: string;
-  to: string;
-  departure: string;
-  arrival: string;
-  duration: string;
-  departureAddress?: string;
-  arrivalAddress?: string;
-  price: number;
-  currency: string;
-  amenities: string[];
-  seatsAvailable: number;
-  vehicleType: 'bus' | 'train'; // Nouveau: type de véhicule
-  busType?: string; // Optionnel pour les bus
-  trainType?: string; // Nouveau: type de train
-  trainClass?: 'economy' | 'business' | 'first'; // Nouveau: classe de train
-  date: string;
-}
-
-interface Seat {
-  seatNumber: string;
-  type: 'standard' | 'premium' | 'vip';
-  price: number;
-}
-
-interface BaggageItem {
-  id: string;
-  type: 'cabine' | 'soute';
-  weight: number;
-  price: number;
-  description: string;
-}
-
-interface BaggageData {
-  items: BaggageItem[];
-  totalCost: number;
-}
-
-interface BookingData {
-  id: string;
-  trip: Trip;
-  seats: Seat[];
-  baggage?: BaggageData;
-  totalPrice: number;
-  currency: string;
-  paymentMethod: string;
-  paymentStatus: 'pending' | 'completed' | 'failed';
-  bookingDate: string;
-  confirmationCode: string;
-}
-
-interface UserPreferences {
-  language: string;
-  currency: string;
-  notifications: boolean;
-  accessibility: {
-    highContrast: boolean;
-    largeText: boolean;
-    reduceMotion: boolean;
-  };
-}
-
-interface FavoriteRoute {
-  id: string;
-  from: string;
-  to: string;
-  addedDate: string;
-}
-
-interface AppState {
-  // Current page state
-  currentPage: string;
-  isLoading: boolean;
-  canGoBack: boolean;
-  userRole: 'guest' | 'superuser' | 'agency' | 'chef' | 'driver' | 'cashier';
-  
-  // Booking flow state
-  searchParams: SearchParams | null;
-  selectedTrip: Trip | null;
-  selectedSeats: Seat[];
-  baggageData: BaggageData | null;
-  bookingData: BookingData | null;
-  bookingProgress: number;
-  paymentStatus: 'pending' | 'completed' | 'failed' | null;
-  
-  // User data
-  bookingHistory: BookingData[];
-  favoriteRoutes: FavoriteRoute[];
-  userPreferences: UserPreferences;
-  
-  // Actions
-  setCurrentPage: (page: string) => void;
-  setSearchParams: (params: SearchParams) => void;
-  setSelectedTrip: (trip: Trip | null) => void;
-  setSelectedSeats: (seats: Seat[]) => void;
-  setBaggageData: (baggage: BaggageData | null) => void;
-  completeBooking: (paymentData: any) => void;
-  resetBookingFlow: () => void;
-  recoverSession: () => void;
-  getSessionAge: () => number;
-  addToFavorites: (route: { from: string; to: string }) => void;
-  updatePreferences: (preferences: Partial<UserPreferences>) => void;
-  clearHistory: () => void;
-  setUserRole: (role: 'guest' | 'superuser' | 'agency' | 'chef' | 'driver' | 'cashier') => void;
-}
+import type {
+  AppState,
+  BaggageData,
+  BookingData,
+  BookingPaymentData,
+  FavoriteRoute,
+  SearchParams,
+  Seat,
+  StoredAppState,
+  Trip,
+  UserPreferences,
+  UserRole,
+} from '../components/app/AppTypes';
+import { resolveInitialPageFromPath } from '../components/app/AppHelpers';
 
 const STORAGE_KEY = 'kongo-app-state';
 
 export function useAppState(): AppState {
-  // Initialize state
   const [currentPage, setCurrentPage] = useState<string>('home');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchParams, setSearchParams] = useState<SearchParams | null>(null);
@@ -139,30 +34,32 @@ export function useAppState(): AppState {
     accessibility: {
       highContrast: false,
       largeText: false,
-      reduceMotion: false
-    }
+      reduceMotion: false,
+    },
   });
-  const [userRole, setUserRole] = useState<'guest' | 'superuser' | 'agency' | 'chef' | 'driver' | 'cashier'>('guest');
+  const [userRole, setUserRole] = useState<UserRole>('guest');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [sessionTimestamp, setSessionTimestamp] = useState<number>(Date.now());
 
-  const stripSensitiveBooking = (booking: any) => {
-    if (!booking) return null;
+  const stripSensitiveBooking = (booking: unknown) => {
+    if (!booking || typeof booking !== 'object') return null;
+
     const {
-      firstName,
-      lastName,
-      email,
-      phone,
-      phoneNumber,
-      cardNumber,
-      cvv,
-      expiryDate,
-      cardName,
+      firstName: _firstName,
+      lastName: _lastName,
+      email: _email,
+      phone: _phone,
+      phoneNumber: _phoneNumber,
+      cardNumber: _cardNumber,
+      cvv: _cvv,
+      expiryDate: _expiryDate,
+      cardName: _cardName,
       ...safe
-    } = booking;
+    } = booking as Record<string, unknown>;
+
     return safe;
   };
 
-  // Calculate booking progress
   const bookingProgress = (() => {
     if (!searchParams) return 0;
     if (!selectedTrip) return 1;
@@ -172,57 +69,56 @@ export function useAppState(): AppState {
     return 5;
   })();
 
-  // Calculate if we can go back
   const canGoBack = currentPage !== 'home';
 
-  // Load state from localStorage on mount
+  const resolveStoredBookingPage = (storedState: StoredAppState) => {
+    if (storedState.bookingData) return 'confirmation';
+    if (storedState.baggageData) return 'payment';
+    if (storedState.selectedSeats && storedState.selectedSeats.length > 0) return 'baggage';
+    if (storedState.selectedTrip) return 'seats';
+    if (storedState.searchParams) return 'search';
+    return 'home';
+  };
+
   useEffect(() => {
     const loadState = () => {
       try {
         const path = window.location.pathname.toLowerCase();
-        let initialPage = 'admin-dashboard';
-        
-        // Fast intercept pour les accès via URL direct
-        if (['/admin', '/caissier', '/agence', '/chef', '/driver'].includes(path)) {
-          initialPage = 'admin-login';
-        } else if (path === '/login') {
-          initialPage = 'login';
-        }
-        
+        const initialPage = resolveInitialPageFromPath(path);
         const stored = localStorage.getItem(STORAGE_KEY);
+
         if (stored) {
-          const parsed = JSON.parse(stored);
-          
-          // Restore state with validation
+          const parsed = JSON.parse(stored) as StoredAppState;
+
           if (parsed.searchParams) setSearchParams(parsed.searchParams);
           if (parsed.selectedTrip) setSelectedTrip(parsed.selectedTrip);
           if (parsed.selectedSeats) setSelectedSeats(parsed.selectedSeats);
           if (parsed.baggageData) setBaggageData(parsed.baggageData);
           if (parsed.bookingData) setBookingData(parsed.bookingData);
           if (parsed.paymentStatus) setPaymentStatus(parsed.paymentStatus);
-          if (parsed.bookingHistory) setBookingHistory(parsed.bookingHistory);
-          if (parsed.favoriteRoutes) setFavoriteRoutes(parsed.favoriteRoutes);
-          if (parsed.userPreferences) setUserPreferences({
-            ...userPreferences,
-            ...parsed.userPreferences
-          });
-          if (parsed.userRole) setUserRole(parsed.userRole);
+          if (parsed.userPreferences) {
+            setUserPreferences((prev) => ({
+              ...prev,
+              ...parsed.userPreferences,
+              accessibility: {
+                ...prev.accessibility,
+                ...(parsed.userPreferences.accessibility || {}),
+              },
+            }));
+          }
           if (parsed.sessionTimestamp) setSessionTimestamp(parsed.sessionTimestamp);
-          if (['/admin', '/caissier', '/agence', '/chef', '/driver'].includes(path)) {
-            setCurrentPage('admin-login');
-          } else if (path === '/login') {
-            setCurrentPage('login');
-          } else if (parsed.currentPage && parsed.currentPage !== 'home') {
-            setCurrentPage(parsed.currentPage);
+
+          if (initialPage !== 'home') {
+            setCurrentPage(initialPage);
+          } else {
+            setCurrentPage(resolveStoredBookingPage(parsed));
           }
         } else {
-          // Aucun state stocké, appliquer initialPage
           setCurrentPage(initialPage);
         }
-      } catch (error) {
-        console.warn('Failed to load app state from localStorage:', error);
+      } catch {
+        // Ignore malformed local state and continue with a clean session.
       } finally {
-        // Add small delay to show loading screen
         setTimeout(() => setIsLoading(false), 800);
       }
     };
@@ -230,31 +126,25 @@ export function useAppState(): AppState {
     loadState();
   }, []);
 
-  // Save state to localStorage whenever state changes
   useEffect(() => {
     if (!isLoading) {
       try {
         const safeBookingData = stripSensitiveBooking(bookingData);
-        const safeBookingHistory = bookingHistory.map(stripSensitiveBooking);
 
-        const stateToSave = {
+        const stateToSave: StoredAppState = {
           searchParams,
           selectedTrip,
           selectedSeats,
           baggageData,
-          bookingData: safeBookingData,
+          bookingData: safeBookingData as unknown as BookingData | null,
           paymentStatus,
-          bookingHistory: safeBookingHistory,
-          favoriteRoutes,
           userPreferences,
-          userRole,
           sessionTimestamp,
-          currentPage: currentPage !== 'home' ? currentPage : null
         };
 
         localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
-      } catch (error) {
-        console.warn('Failed to save app state to localStorage:', error);
+      } catch {
+        // Ignore storage write failures so the booking flow remains usable.
       }
     }
   }, [
@@ -265,15 +155,10 @@ export function useAppState(): AppState {
     baggageData,
     bookingData,
     paymentStatus,
-    bookingHistory,
-    favoriteRoutes,
     userPreferences,
-    userRole,
-    currentPage,
-    sessionTimestamp
+    sessionTimestamp,
   ]);
 
-  // Actions
   const resetBookingFlow = useCallback(() => {
     setCurrentPage('home');
     setSearchParams(null);
@@ -283,36 +168,15 @@ export function useAppState(): AppState {
     setBookingData(null);
     setPaymentStatus(null);
     setSessionTimestamp(Date.now());
-    setUserRole('guest');
   }, []);
 
-  const completeBooking = useCallback((paymentData: any) => {
-    if (!selectedTrip || selectedSeats.length === 0) return;
-
-    const seatsTotalPrice = selectedSeats.reduce((total, seat) => total + seat.price, 0);
-    const baggageTotalPrice = baggageData?.totalCost || 0;
-    const totalPrice = seatsTotalPrice + baggageTotalPrice;
-
-    const booking: BookingData = {
-      id: `BK${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
-      trip: selectedTrip,
-      seats: selectedSeats,
-      baggage: baggageData || undefined,
-      totalPrice,
-      currency: selectedTrip.currency,
-      paymentMethod: paymentData.method,
-      paymentStatus: 'completed',
-      bookingDate: new Date().toISOString(),
-      confirmationCode: `KG${Date.now().toString().slice(-6)}`
-    };
-
+  const completeBooking = useCallback((booking: BookingData) => {
     setBookingData(booking);
     setPaymentStatus('completed');
-    setBookingHistory(prev => [booking, ...prev.slice(0, 9)]); // Keep last 10 bookings
-  }, [selectedTrip, selectedSeats, baggageData]);
+    setBookingHistory((prev) => [booking, ...prev.slice(0, 9)]);
+  }, []);
 
   const recoverSession = useCallback(() => {
-    // Just navigate to the appropriate page based on current state
     if (bookingData) {
       setCurrentPage('confirmation');
     } else if (baggageData) {
@@ -335,25 +199,24 @@ export function useAppState(): AppState {
       id: `fav-${Date.now()}`,
       from: route.from,
       to: route.to,
-      addedDate: new Date().toISOString()
+      addedDate: new Date().toISOString(),
     };
 
-    setFavoriteRoutes(prev => {
-      // Check if route already exists
-      const exists = prev.some(fav => fav.from === route.from && fav.to === route.to);
+    setFavoriteRoutes((prev) => {
+      const exists = prev.some((fav) => fav.from === route.from && fav.to === route.to);
       if (exists) return prev;
-      return [newFavorite, ...prev.slice(0, 9)]; // Keep last 10 favorites
+      return [newFavorite, ...prev.slice(0, 9)];
     });
   }, []);
 
   const updatePreferences = useCallback((newPreferences: Partial<UserPreferences>) => {
-    setUserPreferences(prev => ({
+    setUserPreferences((prev) => ({
       ...prev,
       ...newPreferences,
       accessibility: {
         ...prev.accessibility,
-        ...(newPreferences.accessibility || {})
-      }
+        ...(newPreferences.accessibility || {}),
+      },
     }));
   }, []);
 
@@ -362,10 +225,10 @@ export function useAppState(): AppState {
   }, []);
 
   return {
-    // State
     currentPage,
     isLoading,
     canGoBack,
+    isAuthenticated,
     searchParams,
     selectedTrip,
     selectedSeats,
@@ -377,8 +240,6 @@ export function useAppState(): AppState {
     favoriteRoutes,
     userPreferences,
     userRole,
-    
-    // Actions
     setCurrentPage,
     setSearchParams,
     setSelectedTrip,
@@ -391,6 +252,7 @@ export function useAppState(): AppState {
     addToFavorites,
     updatePreferences,
     clearHistory,
-    setUserRole
+    setUserRole,
+    setIsAuthenticated,
   };
 }

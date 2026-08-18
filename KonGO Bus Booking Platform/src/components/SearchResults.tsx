@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
 import { Card, CardContent } from "./ui/card";
@@ -271,16 +271,13 @@ export function SearchResults({ searchParams, onSelectTrip, onSearch, userRole, 
         `)
         .eq('status', 'scheduled');
 
+      let dateToCompare = new Date();
       if (travelDate) {
-        const startOfDay = new Date(travelDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(travelDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        query = query
-          .gte('departure_time', startOfDay.toISOString())
-          .lte('departure_time', endOfDay.toISOString());
+        dateToCompare = new Date(travelDate);
       }
+      dateToCompare.setHours(0, 0, 0, 0);
+
+      query = query.gte('departure_time', dateToCompare.toISOString());
 
       if (departureStopId !== 'all') {
         query = query.eq('departure_stop_id', departureStopId);
@@ -328,6 +325,7 @@ export function SearchResults({ searchParams, onSelectTrip, onSearch, userRole, 
           from: originName,
           to: destName,
           route: `${originName} → ${destName}`,
+          dateLabel: effectiveDep.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }),
           departure: effectiveDep.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
           arrival: effectiveArr.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
           duration: trip.duration || `${durationHours}h`,
@@ -344,6 +342,7 @@ export function SearchResults({ searchParams, onSelectTrip, onSearch, userRole, 
           operator: trip.agencies?.name || 'KonGO Express',
           isPopular: trip.is_popular || false,
           stops: trip.stops || [],
+          agency_id: trip.agency_id,
           amenitiesLabels: (trip.amenities || []).map((a: string) => amenityLabels[a] || a.charAt(0).toUpperCase() + a.slice(1))
         };
       });
@@ -817,6 +816,7 @@ export function SearchResults({ searchParams, onSelectTrip, onSearch, userRole, 
 
                           <div className="flex items-center space-x-4 mb-4">
                             <div className="text-left">
+                              <div className="text-xs text-kongo-lime-dark font-bold mb-1 truncate max-w-[120px] uppercase tracking-wide">{trip.dateLabel}</div>
                               <div className="text-4xl font-extrabold text-kongo-black leading-none mb-1">{trip.departure}</div>
                               <div className="text-sm text-gray-500 font-medium">{trip.from}</div>
                             </div>
@@ -833,6 +833,7 @@ export function SearchResults({ searchParams, onSelectTrip, onSearch, userRole, 
                             </div>
 
                             <div className="text-left">
+                              <div className="text-xs text-transparent font-bold mb-1 uppercase tracking-wide cursor-default pointer-events-none select-none">Jour J</div>
                               <div className="text-4xl font-extrabold text-kongo-black leading-none mb-1">{trip.arrival}</div>
                               <div className="text-sm text-gray-500 font-medium">{trip.to}</div>
                             </div>

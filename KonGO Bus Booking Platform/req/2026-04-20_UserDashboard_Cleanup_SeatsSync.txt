@@ -1,0 +1,39 @@
+=============================================================
+SESSION : 2026-04-20_UserDashboard_Cleanup_SeatsSync
+AGENTS  : Agent Dev Web, Agent Supabase, Agent Archiviste
+=============================================================
+
+## DEMANDE UTILISATEUR
+Finaliser la synchronisation des siège et nettoyer le UserDashboard :
+- Supprimer l'historique des voyages passés
+- Filtrer les voyages à venir : non scannés + date future
+- Synchroniser la logique de sièges sur toutes les plateformes
+
+## TRAVAIL EFFECTUÉ
+
+### Mobile — kongo/src/screens/SeatSelectionScreen.tsx
+- [x] Fetch en deux étapes (occupied + reserved)
+- [x] Statut 'reserved' ajouté (orange)
+- [x] Légende UI mise à jour
+- [x] Toggle bloqué pour réservé ET occupé
+
+### Web — KonGO Bus Booking Platform/src/components/UserDashboard.tsx
+- [x] Suppression du bloc "Historique des voyages (Passés)"
+- [x] Suppression prop bookingHistory (interface + destructure)
+- [x] Suppression imports inutiles : Archive, CheckCircle2
+- [x] Fetch Step 2 : enrichissement tickets avec statut scan (ticket_scans)
+- [x] Filtre strict : !ticket.scanned && departure_time >= now
+- [x] UI "Voyages Confirmés & À venir" basée sur purchasedTickets (Supabase)
+
+## FICHIERS MODIFIÉS
+1. c:\web\meji\kongo\kongo\src\screens\SeatSelectionScreen.tsx
+2. c:\web\meji\kongo\KonGO Bus Booking Platform\src\components\UserDashboard.tsx
+
+## STANDARD COULEURS ÉTABLI (Cross-Platform)
+- Occupé  (paid)    → Gris   #6B7280
+- Réservé (pending) → Orange #F97316
+- Sélectionné       → Vert   #84CC16
+- Libre             → Blanc  #FFFFFF
+
+## STATUT : ✅ TERMINÉ — Aucun bloqueur
+=============================================================

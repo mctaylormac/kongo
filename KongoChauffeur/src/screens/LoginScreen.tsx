@@ -6,6 +6,7 @@ import {
   Alert, StatusBar, Image
 } from 'react-native';
 import { supabase } from '../lib/supabase';
+import { TriangleAlert } from 'lucide-react-native';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -69,7 +70,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         {error ? (
           <View style={styles.errorBox}>
-            <Text style={styles.errorText}>⚠ {error}</Text>
+            <View style={styles.errorRow}>
+              <TriangleAlert color="#FF6B6B" size={15} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
           </View>
         ) : null}
 
@@ -184,10 +188,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#8B1A1A',
   },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   errorText: {
     color: '#FF6B6B',
     fontSize: 13,
     fontWeight: '600',
+    flex: 1,
   },
   inputGroup: {
     marginBottom: 16,

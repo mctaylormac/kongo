@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Mail, Phone, Calendar, MapPin, Loader2, Shield } from 'lucide-react';
+import { Users, Search, Mail, Phone, Calendar, MapPin, Loader2, Shield, Eye, Ticket, CreditCard } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 
 export function ClientManagement() {
     const [isLoading, setIsLoading] = useState(true);
     const [clients, setClients] = useState<any[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedClient, setSelectedClient] = useState<any | null>(null);
+    const [isDetailOpen, setIsDetailOpen] = useState(false);
+    const [isLoadingPaidTickets, setIsLoadingPaidTickets] = useState(false);
+    const [paidTickets, setPaidTickets] = useState<any[]>([]);
 
     const fetchClients = async () => {
         setIsLoading(true);
@@ -28,6 +33,39 @@ export function ClientManagement() {
     useEffect(() => {
         fetchClients();
     }, []);
+
+    const fetchPaidTicketsForClient = async (clientId: string) => {
+        setIsLoadingPaidTickets(true);
+        try {
+            const { data, error } = await supabase
+                .from('bookings')
+                .select(`
+                    id,
+                    booking_code,
+                    total_price,
+                    currency,
+                    payment_status,
+                    payment_method,
+                    created_at,
+                    trips(
+                        id,
+                        origin:locations!origin_location_id(name),
+                        destination:locations!destination_location_id(name)
+                    )
+                `)
+                .eq('user_id', clientId)
+                .eq('payment_status', 'paid')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setPaidTickets(data || []);
+        } catch (error: any) {
+            toast.error("Impossible de charger les tickets payés de cet utilisateur");
+            setPaidTickets([]);
+        } finally {
+            setIsLoadingPaidTickets(false);
+        }
+    };
 
     const filteredClients = clients.filter(client =>
         (client.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -69,6 +107,7 @@ export function ClientManagement() {
                                 <th className="px-6 py-4 text-label font-bold text-kongo-black">Ville</th>
                                 <th className="px-6 py-4 text-label font-bold text-kongo-black">Rôle</th>
                                 <th className="px-6 py-4 text-label font-bold text-kongo-black">Inscription</th>
+                                <th className="px-6 py-4 text-label font-bold text-kongo-black text-right">Détail</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border-primary">
@@ -106,6 +145,19 @@ export function ClientManagement() {
                                     <td className="px-6 py-4 text-body-small text-tertiary">
                                         {new Date(client.created_at).toLocaleDateString()}
                                     </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <button
+                                            onClick={() => {
+                                                setSelectedClient(client);
+                                                setIsDetailOpen(true);
+                                                void fetchPaidTicketsForClient(client.id);
+                                            }}
+                                            className="inline-flex items-center justify-center w-9 h-9 rounded-lg hover:bg-gray-100 transition-colors text-secondary"
+                                            aria-label="Voir le détail utilisateur"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -115,6 +167,108 @@ export function ClientManagement() {
                     <div className="p-12 text-center text-tertiary">Aucun utilisateur trouvé.</div>
                 )}
             </div>
+
+            <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+                <DialogContent className="sm:max-w-4xl w-[95vw] max-h-[90vh] overflow-hidden p-0">
+                    <div className="flex flex-col h-full">
+                        <DialogHeader className="p-6 border-b border-border-primary bg-surface-secondary">
+                            <DialogTitle className="text-h4 font-bold text-kongo-black">
+                                Détail Utilisateur
+                            </DialogTitle>
+                        </DialogHeader>
+
+                        <div className="p-6 space-y-6 overflow-y-auto">
+                            {selectedClient && (
+                                <section className="card-elevated p-5">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-12 rounded-full bg-kongo-black flex items-center justify-center text-on-black text-xs font-bold">
+                                                {selectedClient.full_name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || '??'}
+                                            </div>
+                                            <div>
+                                                <h3 className="text-body-large font-bold text-kongo-black">{selectedClient.full_name || 'Utilisateur'}</h3>
+                                                <p className="text-body-small text-tertiary">{selectedClient.email || 'Email non renseigné'}</p>
+                                            </div>
+                                        </div>
+                                        <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-secondary">
+                                            {selectedClient.role || 'user'}
+                                        </span>
+                                    </div>
+                                    <div className="mt-4 grid sm:grid-cols-3 gap-3 text-body-small">
+                                        <div className="flex items-center text-secondary"><Phone className="w-3.5 h-3.5 mr-2" /> {selectedClient.phone_number || '---'}</div>
+                                        <div className="flex items-center text-secondary"><MapPin className="w-3.5 h-3.5 mr-2" /> {selectedClient.city || '---'}</div>
+                                        <div className="flex items-center text-secondary"><Calendar className="w-3.5 h-3.5 mr-2" /> Inscrit le {new Date(selectedClient.created_at).toLocaleDateString()}</div>
+                                    </div>
+                                </section>
+                            )}
+
+                            <section className="card-elevated overflow-hidden">
+                                <div className="px-5 py-4 border-b border-border-primary flex items-center justify-between">
+                                    <h4 className="text-label font-bold text-kongo-black flex items-center">
+                                        <Ticket className="w-4 h-4 mr-2" />
+                                        Tickets payés par cet utilisateur
+                                    </h4>
+                                    <span className="text-[11px] text-tertiary">
+                                        Total: {paidTickets.length}
+                                    </span>
+                                </div>
+
+                                {isLoadingPaidTickets ? (
+                                    <div className="p-10 flex justify-center">
+                                        <Loader2 className="animate-spin text-kongo-lime" />
+                                    </div>
+                                ) : paidTickets.length === 0 ? (
+                                    <div className="p-8 text-center text-tertiary text-body-small">
+                                        Aucun ticket payé trouvé pour cet utilisateur.
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-gray-50 border-b border-border-primary">
+                                                <tr>
+                                                    <th className="px-5 py-3 text-label font-bold text-kongo-black">Référence</th>
+                                                    <th className="px-5 py-3 text-label font-bold text-kongo-black">Trajet</th>
+                                                    <th className="px-5 py-3 text-label font-bold text-kongo-black">Date</th>
+                                                    <th className="px-5 py-3 text-label font-bold text-kongo-black">Paiement</th>
+                                                    <th className="px-5 py-3 text-label font-bold text-kongo-black text-right">Montant</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border-primary">
+                                                {paidTickets.map((ticket) => (
+                                                    <tr key={ticket.id} className="hover:bg-gray-50 transition-colors">
+                                                        <td className="px-5 py-3 font-mono text-body-small font-bold text-kongo-black">
+                                                            {ticket.booking_code || '---'}
+                                                        </td>
+                                                        <td className="px-5 py-3 text-body-small text-secondary">
+                                                            {ticket.trips?.origin?.name || '---'} → {ticket.trips?.destination?.name || '---'}
+                                                        </td>
+                                                        <td className="px-5 py-3 text-body-small text-tertiary">
+                                                            {new Date(ticket.created_at).toLocaleDateString('fr-FR')}
+                                                        </td>
+                                                        <td className="px-5 py-3 text-body-small text-secondary">
+                                                            <span className="inline-flex items-center">
+                                                                <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+                                                                {ticket.payment_method || 'N/A'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-5 py-3 text-body-small font-bold text-kongo-black text-right">
+                                                            {new Intl.NumberFormat('fr-CD', {
+                                                                style: 'currency',
+                                                                currency: ticket.currency || 'CDF',
+                                                                maximumFractionDigits: 0
+                                                            }).format(ticket.total_price || 0)}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </section>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -5,11 +5,8 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { Progress } from "./ui/progress";
-import { Separator } from "./ui/separator";
 import { Textarea } from "./ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
-import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
@@ -20,6 +17,7 @@ import { UserPreferencesManager } from "./UserPreferencesManager";
 import { AdvancedChatSystem } from "./AdvancedChatSystem";
 import { GamificationSystem } from "./GamificationSystem";
 import { TripRatingFeedback, useTripsForRating } from "./TripRatingFeedback";
+import { DeleteAccountDialog } from "./DeleteAccountDialog";
 
 import {
   User,
@@ -68,7 +66,6 @@ import {
   Coins,
   TrendingDown,
   AlertTriangle,
-  Sparkles,
   Rocket,
   ThumbsUp,
   ThumbsDown,
@@ -78,14 +75,14 @@ import {
   Building2,
   Truck,
   Ticket,
-  Info
+  Info,
+  Trash2
 } from "lucide-react";
 
 interface UserDashboardProps {
   onPageChange?: (page: string) => void;
   onSearch?: (searchData: any) => void;
   favoriteRoutes?: any[];
-  bookingHistory?: any[];
   className?: string;
 }
 
@@ -134,11 +131,29 @@ interface Trip {
   rating?: TripRating;
 }
 
+interface PurchasedTicket {
+  id: string;
+  booking_code: string;
+  total_price: number;
+  currency: string;
+  payment_method: string | null;
+  payment_status: string | null;
+  status: string | null;
+  created_at: string;
+  seats?: any;
+  scanned?: boolean; // true if a ticket_scan record exists for this booking
+  trips?: {
+    origin?: { name?: string };
+    destination?: { name?: string };
+    departure_time?: string;
+  };
+}
+
+// [Agent Dev Web] - Action: UserDashboard nettoyé - bookingHistory remplacé par purchasedTickets (Supabase)
 export function UserDashboard({
   onPageChange,
   onSearch,
   favoriteRoutes = [],
-  bookingHistory = [],
   className = ""
 }: UserDashboardProps) {
   const [activeTab, setActiveTab] = useState('trips');
@@ -146,6 +161,7 @@ export function UserDashboard({
   const [showChat, setShowChat] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedTripToRate, setSelectedTripToRate] = useState<Trip | null>(null);
+  const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
   
   const [selectedProvince, setSelectedProvince] = useState<string>("Kinshasa");
   const [provinceStops, setProvinceStops] = useState<any[]>([]);
@@ -171,10 +187,8 @@ export function UserDashboard({
   const [ratingFilter, setRatingFilter] = useState<'all' | 'pending' | 'completed'>('all');
 
   // Verification state for "My Trips"
-  const [isTripVerified, setIsTripVerified] = useState(false);
-  const [verificationLoading, setVerificationLoading] = useState(false);
-  const [ticketNumber, setTicketNumber] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [purchasedTickets, setPurchasedTickets] = useState<PurchasedTicket[]>([]);
+  const [loadingPurchasedTickets, setLoadingPurchasedTickets] = useState(false);
 
 
   const { tripsToRate, loading: loadingTrips, fetchTripsToRate } = useTripsForRating();
@@ -307,8 +321,8 @@ export function UserDashboard({
     badges: ['Early Bird', 'Eco Warrior', 'Social Butterfly', 'Review Master'],
     nextReward: { name: 'Voyage Gratuit', progress: 85 },
     recentActivity: [
-      { type: 'trip', description: 'Voyage Kinshasa ? Goma', date: new Date(Date.now() - 86400000) },
-      { type: 'review', description: 'Avis publi? pour Trans-Congo Express', date: new Date(Date.now() - 172800000) },
+      { type: 'trip', description: 'Voyage Kinshasa → Goma', date: new Date(Date.now() - 86400000) },
+      { type: 'review', description: 'Avis publié pour Trans-Congo Express', date: new Date(Date.now() - 172800000) },
       { type: 'achievement', description: 'Achievement "Distance Master" débloqué', date: new Date(Date.now() - 259200000) }
     ]
   });
@@ -320,6 +334,8 @@ export function UserDashboard({
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
+          setLoadingPurchasedTickets(true);
+
           const { data: profile, error } = await supabase
             .from('profiles')
             .select('*')
@@ -338,9 +354,57 @@ export function UserDashboard({
               joinDate: new Date(profile.created_at)
             }));
           }
+
+          // [Agent Supabase] - Action: Two-step fetch with scan status enrichment
+          const { data: tickets, error: ticketsError } = await supabase
+            .from('bookings')
+            .select(`
+              id,
+              booking_code,
+              total_price,
+              currency,
+              payment_method,
+              payment_status,
+              status,
+              created_at,
+              seats,
+              trips(
+                origin:locations!origin_location_id(name),
+                destination:locations!destination_location_id(name),
+                departure_time
+              )
+            `)
+            .eq('user_id', user.id)
+            .eq('payment_status', 'paid')
+            .order('created_at', { ascending: false });
+
+          if (ticketsError) {
+            console.error('Error fetching purchased tickets:', ticketsError);
+            setPurchasedTickets([]);
+          } else if (tickets && tickets.length > 0) {
+            // Step 2: Check which bookings have been scanned
+            const bookingIds = tickets.map(t => t.id);
+            const { data: scans } = await supabase
+              .from('ticket_scans')
+              .select('booking_id')
+              .in('booking_id', bookingIds)
+              .eq('result', 'valid');
+
+            const scannedIds = new Set((scans || []).map(s => s.booking_id));
+
+            const enriched = tickets.map(t => ({
+              ...t,
+              scanned: scannedIds.has(t.id),
+            }));
+            setPurchasedTickets(enriched as PurchasedTicket[]);
+          } else {
+            setPurchasedTickets([]);
+          }
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
+      } finally {
+        setLoadingPurchasedTickets(false);
       }
     };
 
@@ -354,7 +418,7 @@ export function UserDashboard({
   };
 
   const handleSaveComment = async (ratingId: string) => {
-    toast.loading("Mise ? jour du commentaire...", { id: 'update-comment' });
+    toast.loading("Mise à jour du commentaire...", { id: 'update-comment' });
 
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -369,7 +433,7 @@ export function UserDashboard({
 
   const handleAddHelpful = (ratingId: string) => {
     toast.success("Merci ! Votre avis sur cet avis a été enregistr?", {
-      description: "Cela aide d'autres voyageurs à prendre de meilleures décisions"
+      description: "Cela aide d'autres voyageurs Ã  prendre de meilleures décisions"
     });
   };
 
@@ -421,100 +485,6 @@ export function UserDashboard({
       </div>
     );
   };
-
-  const recentRewardsSection = (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <Card className="card-elevated">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-3">
-              <Clock className="w-5 h-5 text-kongo-black" />
-              <span>Activité Récente</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {userData.recentActivity.map((activity, index) => (
-              <div key={index} className="flex items-center space-x-3 p-3 bg-surface-secondary rounded-lg">
-                <div className={`p-2 rounded-lg ${activity.type === 'trip'
-                  ? 'bg-kongo-lime/20 text-kongo-lime-dark'
-                  : activity.type === 'review'
-                    ? 'bg-blue-100 text-blue-600'
-                    : 'bg-purple-100 text-purple-600'
-                  }`}>
-                  {activity.type === 'trip' && <MapPin className="w-4 h-4" />}
-                  {activity.type === 'review' && <Star className="w-4 h-4" />}
-                  {activity.type === 'achievement' && <Trophy className="w-4 h-4" />}
-                </div>
-                <div className="flex-1">
-                  <p className="text-label">{activity.description}</p>
-                  <p className="text-body-small text-secondary">
-                    {activity.date.toLocaleDateString('fr-FR')}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <Card className="card-elevated">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-3">
-              <Gift className="w-5 h-5 text-kongo-black" />
-              <span>Prochaines Récompenses</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-label font-medium">{userData.nextReward.name}</span>
-                <span className="text-body-small text-kongo-lime-dark font-semibold">
-                  {userData.nextReward.progress}%
-                </span>
-              </div>
-              <Progress value={userData.nextReward.progress} className="h-3" />
-              <p className="text-body-small text-secondary">
-                Plus que {100 - userData.nextReward.progress}% pour débloquer
-              </p>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-3">
-              <h4 className="text-label font-semibold">Disponibles maintenant</h4>
-              <div className="space-y-3">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start border-2 border-kongo-lime bg-kongo-lime/10 text-kongo-black hover:bg-kongo-lime hover:text-kongo-black shadow-sm"
-                  onClick={() => setActiveTab('gamification')}
-                >
-                  <Coins className="w-4 h-4 mr-2" />
-                  Échanger 500 points pour 10% de récupération
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start border-2 border-kongo-black/15 bg-surface-secondary text-kongo-black hover:border-kongo-lime hover:bg-surface-kongo-lime-light shadow-sm"
-                  onClick={() => setActiveTab('gamification')}
-                >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Débloquer le badge Expert Voyageur
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </div>
-  );
 
   return (
     <div className={`min-h-screen bg-surface-primary ${className}`}>
@@ -623,39 +593,66 @@ export function UserDashboard({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
           {/* Enhanced Tab Navigation */}
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-7 bg-surface-secondary p-1 rounded-xl">
-            <TabsTrigger value="trips" className="flex items-center space-x-2 py-3">
-              <MapPin className="w-4 h-4" />
-              <span className="hidden sm:inline">Mes trajets</span>
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 mb-8 h-auto p-2 bg-gray-100 border-2 border-gray-300 rounded-2xl shadow-inner gap-2">
+            <TabsTrigger
+              value="trips"
+              className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-xs sm:text-sm md:text-base cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+            >
+              <MapPin className="w-4 h-4 shrink-0" />
+              <span>Mes trajets</span>
             </TabsTrigger>
-            <TabsTrigger value="favorites" className="flex items-center space-x-2 py-3">
-              <Heart className="w-4 h-4" />
-              <span className="hidden sm:inline">Favoris</span>
+
+            <TabsTrigger
+              value="favorites"
+              className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-xs sm:text-sm md:text-base cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+            >
+              <Heart className="w-4 h-4 shrink-0" />
+              <span>Favoris</span>
             </TabsTrigger>
-            <TabsTrigger value="ratings" className="flex items-center space-x-2 py-3 relative">
-              <Star className="w-4 h-4" />
-              <span className="hidden sm:inline">Évaluations</span>
+
+            <TabsTrigger
+              value="ratings"
+              className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-xs sm:text-sm md:text-base cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl relative"
+            >
+              <Star className="w-4 h-4 shrink-0" />
+              <span>Évaluations</span>
               {tripsToRate.length > 0 && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-kongo-lime text-kongo-black rounded-full text-xs flex items-center justify-center font-bold">
+                <div className="w-5 h-5 bg-[#C8E63C] text-black rounded-full text-xs flex items-center justify-center font-black border border-black ml-1">
                   {tripsToRate.length}
                 </div>
               )}
             </TabsTrigger>
-            <TabsTrigger value="gamification" className="flex items-center space-x-2 py-3">
-              <Trophy className="w-4 h-4" />
-              <span className="hidden sm:inline">Récompenses</span>
+
+            <TabsTrigger
+              value="gamification"
+              className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-xs sm:text-sm md:text-base cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+            >
+              <Trophy className="w-4 h-4 shrink-0" />
+              <span>Récompenses</span>
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center space-x-2 py-3">
-              <TrendingUp className="w-4 h-4" />
-              <span className="hidden sm:inline">Analytiques</span>
+
+            <TabsTrigger
+              value="analytics"
+              className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-xs sm:text-sm md:text-base cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+            >
+              <TrendingUp className="w-4 h-4 shrink-0" />
+              <span>Analytiques</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center space-x-2 py-3">
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Paramètres</span>
+
+            <TabsTrigger
+              value="settings"
+              className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-xs sm:text-sm md:text-base cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+            >
+              <Settings className="w-4 h-4 shrink-0" />
+              <span>Paramètres</span>
             </TabsTrigger>
-            <TabsTrigger value="stops" className="flex items-center space-x-2 py-3">
-              <MapPin className="w-4 h-4" />
-              <span className="hidden sm:inline">Arrêts</span>
+
+            <TabsTrigger
+              value="stops"
+              className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-xs sm:text-sm md:text-base cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+            >
+              <MapPin className="w-4 h-4 shrink-0" />
+              <span>Arrêts</span>
             </TabsTrigger>
           </TabsList>
 
@@ -664,7 +661,7 @@ export function UserDashboard({
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 space-y-4 lg:space-y-0">
                 <div>
-                  <h2 className="text-h3 font-bold text-primary">Arrêts par Province</h2>
+                  <h2 className="text-h3 font-bold text-primary">ArrÃªts par Province</h2>
                   <p className="text-body text-secondary">
                     Consultez les points d'embarquement et de débarquement disponibles.
                   </p>
@@ -691,9 +688,9 @@ export function UserDashboard({
               ) : provinceStops.length === 0 ? (
                 <Card className="card-elevated mb-8 p-10 text-center">
                   <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-h4 text-primary mb-2">Aucun arrêt trouvé</h3>
+                  <h3 className="text-h4 text-primary mb-2">Aucun arrÃªt trouvé</h3>
                   <p className="text-body text-secondary">
-                    Il n'y a pas encore d'arrêts configurés pour {selectedProvince}.
+                    Il n'y a pas encore d'arrÃªts configurés pour {selectedProvince}.
                   </p>
                 </Card>
               ) : (
@@ -735,7 +732,7 @@ export function UserDashboard({
             >
               <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 space-y-4 lg:space-y-0">
                 <div>
-                  <h2 className="text-h3 font-bold text-primary">Évaluations et Commentaires</h2>
+                  <h2 className="text-h3 font-bold text-primary">Ã‰valuations et Commentaires</h2>
                   <p className="text-body text-secondary">
                     Partagez votre expérience et aidez d'autres voyageurs
                   </p>
@@ -772,7 +769,7 @@ export function UserDashboard({
 
                   <Button
                     onClick={fetchTripsToRate}
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     className="btn-ghost"
                     disabled={loadingTrips}
@@ -831,7 +828,7 @@ export function UserDashboard({
                           className="btn-secondary"
                         >
                           <Star className="w-4 h-4 mr-2" />
-                          Évaluer
+                          Ã‰valuer
                         </Button>
                       </div>
                     ))}
@@ -846,7 +843,7 @@ export function UserDashboard({
                     <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
                     <h3 className="text-h4 text-primary mb-2">Tous vos voyages sont évalués !</h3>
                     <p className="text-body text-secondary">
-                      Merci de contribuer à améliorer l'expérience KonGO
+                      Merci de contribuer Ã  améliorer l'expérience KonGO
                     </p>
                   </CardContent>
                 </Card>
@@ -888,7 +885,7 @@ export function UserDashboard({
                             <div className="text-right">
                               {renderStars(trip.rating!.overallRating, 'lg')}
                               <p className="text-body-small text-secondary mt-1">
-                                Évalué le {trip.rating!.date.toLocaleDateString('fr-FR')}
+                                Ã‰valué le {trip.rating!.date.toLocaleDateString('fr-FR')}
                               </p>
                             </div>
                           </div>
@@ -940,12 +937,12 @@ export function UserDashboard({
                                 />
                                 <div className="flex items-center justify-between">
                                   <span className="text-body-xs text-tertiary">
-                                    {newComment.length}/500 caractères
+                                    {newComment.length}/500 caractÃ¨res
                                   </span>
                                   <div className="flex space-x-2">
                                     <Button
                                       size="sm"
-                                      variant="outline"
+                                      variant="ghost"
                                       onClick={() => {
                                         setEditingComment(null);
                                         setNewComment("");
@@ -997,7 +994,7 @@ export function UserDashboard({
                                   <div className="flex items-center space-x-4">
                                     <Button
                                       size="sm"
-                                      variant="outline"
+                                      variant="ghost"
                                       onClick={() => handleEditComment(trip.rating!.id, trip.rating!.comment)}
                                       className="btn-ghost"
                                     >
@@ -1031,7 +1028,7 @@ export function UserDashboard({
                         <Star className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                         <h3 className="text-h4 text-primary mb-2">Aucune évaluation pour le moment</h3>
                         <p className="text-body text-secondary">
-                          Vos évaluations apparaîtront ici après vos voyages
+                          Vos évaluations apparaÃ®tront ici aprÃ¨s vos voyages
                         </p>
                       </CardContent>
                     </Card>
@@ -1051,203 +1048,173 @@ export function UserDashboard({
                 </p>
               </div>
 
-              {isTripVerified && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsTripVerified(false)}
-                  className="btn-ghost"
-                >
-                  <Shield className="w-4 h-4 mr-2" />
-                  Se déconnecter du trajet
-                </Button>
-              )}
             </div>
 
-            {recentRewardsSection}
-
-            {!isTripVerified ? (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="max-w-md mx-auto"
-              >
-                <Card className="card-elevated border-kongo-lime/20 overflow-hidden">
-                  <div className="bg-kongo-black p-6 text-center text-on-black">
-                    <Shield className="w-12 h-12 text-kongo-lime mx-auto mb-4" />
-                    <h3 className="text-h4 font-bold">Vérification Requise</h3>
-                    <p className="text-body-small opacity-80 mt-2">
-                      Veuillez entrer vos informations pour accéder aux détails de vos voyages
-                    </p>
+            {/* Purchased Tickets */}
+            <Card className="card-elevated">
+              <CardHeader className="border-b border-border-primary">
+                <CardTitle className="text-h5 flex items-center justify-between">
+                  <span className="flex items-center">
+                    <Ticket className="w-5 h-5 mr-2 text-kongo-black" />
+                    Mes tickets achetés
+                  </span>
+                  <Badge className="status-info">
+                    {purchasedTickets.length} ticket{purchasedTickets.length > 1 ? 's' : ''}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loadingPurchasedTickets ? (
+                  <div className="p-10 flex justify-center">
+                    <div className="w-8 h-8 border-2 border-kongo-black border-t-transparent rounded-full animate-spin" />
                   </div>
-                  <CardContent className="p-6 space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-label font-semibold">Numéro de ticket (Référence)</label>
-                      <div className="relative">
-                        <Ticket className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-tertiary" />
-                        <Input
-                          placeholder="Ex: KGO12345678"
-                          className="pl-10"
-                          value={ticketNumber}
-                          onChange={(e) => setTicketNumber(e.target.value)}
-                        />
+                ) : purchasedTickets.length === 0 ? (
+                  <div className="p-10 text-center text-secondary">
+                    <Ticket className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                    <p>Aucun ticket acheté pour le moment.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border-primary">
+                    {purchasedTickets.map((ticket) => (
+                      <div key={ticket.id} className="p-6 hover:bg-surface-secondary transition-colors">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-body-small font-bold text-kongo-black">
+                                {ticket.booking_code || 'Ticket sans référence'}
+                              </span>
+                              <Badge className="status-kongo">Payé</Badge>
+                            </div>
+                            <p className="text-body-small text-primary">
+                              {(ticket.trips as any)?.origin?.name || 'Départ'} → {(ticket.trips as any)?.destination?.name || 'Arrivée'}
+                            </p>
+                            <div className="text-body-xs text-secondary flex flex-wrap gap-3">
+                              <span className="flex items-center"><Calendar className="w-3 h-3 mr-1" />{new Date(ticket.created_at).toLocaleDateString('fr-FR')}</span>
+                              <span className="flex items-center"><Clock className="w-3 h-3 mr-1" />{(ticket.trips as any)?.departure_time ? new Date((ticket.trips as any).departure_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</span>
+                              <span className="flex items-center"><CreditCard className="w-3 h-3 mr-1" />{ticket.payment_method || 'Non précisé'}</span>
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <p className="text-h5 font-black text-kongo-black">
+                              {new Intl.NumberFormat('fr-CD', {
+                                style: 'currency',
+                                currency: ticket.currency || 'CDF',
+                                maximumFractionDigits: 0,
+                              }).format(Number(ticket.total_price || 0))}
+                            </p>
+                            <p className="text-body-xs text-tertiary">
+                              Sièges: {Array.isArray(ticket.seats) ? ticket.seats.length : 1}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-                    <div className="space-y-2">
-                      <label className="text-label font-semibold">Numéro de téléphone</label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-tertiary" />
-                        <Input
-                          placeholder="+243 ..."
-                          className="pl-10"
-                          value={phoneNumber}
-                          onChange={(e) => setPhoneNumber(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <Button
-                      className="btn-primary w-full h-12"
-                      disabled={verificationLoading || !ticketNumber || !phoneNumber}
-                      onClick={async () => {
-                        setVerificationLoading(true);
-                        // Simulate verification
-                        await new Promise(resolve => setTimeout(resolve, 1500));
-                        setIsTripVerified(true);
-                        setVerificationLoading(false);
-                        toast.success("Accès autorisé", {
-                          description: "Vos informations de voyage sont maintenant visibles"
-                        });
-                      }}
-                    >
-                      {verificationLoading ? (
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <Eye className="w-4 h-4 mr-2" />
-                          Voir mes informations
-                        </>
-                      )}
-                    </Button>
-
-                    <div className="flex items-start space-x-2 p-3 bg-surface-kongo-lime-light rounded-lg border border-kongo-lime/20">
-                      <Info className="w-4 h-4 text-kongo-lime-dark mt-0.5 shrink-0" />
-                      <p className="text-caption text-kongo-lime-dark">
-                        Cette étape supplémentaire garantit la confidentialité de vos données personnelles et de vos titres de transport.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-6"
-              >
-                {/* Active and Upcoming Trips */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+                {/* [Agent Dev Web] - Action: Voyages à venir - Filtrés (non scannés + date future) */}
                 <Card className="card-elevated">
                   <CardHeader className="border-b border-border-primary">
                     <CardTitle className="text-h5 flex items-center">
                       <Zap className="w-5 h-5 mr-2 text-warning" />
-                      Voyages Actifs & À venir
+                      Voyages Confirmés &amp; À venir
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
-                    <div className="divide-y divide-border-primary">
-                      {bookingHistory.filter(trip => trip.status !== 'completed').map((trip) => (
-                        <div key={trip.id} className="p-6 hover:bg-surface-secondary transition-colors group">
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                            <div className="flex items-center space-x-6">
-                              <div className="w-16 h-16 bg-kongo-lime rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                <MapPin className="w-8 h-8 text-kongo-black" />
-                              </div>
-                              <div>
-                                <div className="flex items-center space-x-2 mb-1">
-                                  <h4 className="text-h5 font-bold text-primary">{trip.from} ? {trip.to}</h4>
-                                  <Badge className="status-kongo">Confirmé</Badge>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-body-small text-secondary">
-                                  <span className="flex items-center"><Calendar className="w-3 h-3 mr-1" /> {trip.date}</span>
-                                  <span className="flex items-center"><Clock className="w-3 h-3 mr-1" /> {trip.departure}</span>
-                                  <span className="flex items-center"><Ticket className="w-3 h-3 mr-1" /> {trip.id}</span>
-                                </div>
-                              </div>
-                            </div>
+                    {loadingPurchasedTickets ? (
+                      <div className="p-10 flex justify-center">
+                        <div className="w-8 h-8 border-2 border-kongo-black border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    ) : (() => {
+                      const now = new Date();
+                      const upcomingTickets = purchasedTickets.filter(ticket => {
+                        const depTime = (ticket.trips as any)?.departure_time;
+                        const isFuture = depTime ? new Date(depTime) >= now : true;
+                        return !ticket.scanned && isFuture;
+                      });
 
-                            <div className="flex items-center space-x-3">
-                              <Button variant="outline" size="sm" className="btn-ghost">
-                                <Download className="w-4 h-4 mr-2" />
-                                PDF
-                              </Button>
-                              <Button className="btn-secondary">
-                                <Eye className="w-4 h-4 mr-2" />
-                                Détails
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      {bookingHistory.filter(trip => trip.status !== 'completed').length === 0 && (
-                        <div className="p-12 text-center text-secondary">
-                          <MapPin className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                          <p>Aucun voyage actif ou prévu pour le moment.</p>
-                          <Button
-                            variant="link"
-                            className="text-kongo-lime-dark font-bold mt-2"
-                            onClick={() => onPageChange?.('search')}
-                          >
-                            Réserver un nouveau trajet
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Past Trips */}
-                <Card className="card-elevated">
-                  <CardHeader className="border-b border-border-primary">
-                    <CardTitle className="text-h5 flex items-center">
-                      <Archive className="w-5 h-5 mr-2 text-secondary" />
-                      Historique des voyages (Passés)
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="divide-y divide-border-primary">
-                      {bookingHistory.filter(trip => trip.status === 'completed').map((trip) => (
-                        <div key={trip.id} className="p-6 hover:bg-surface-secondary transition-colors opacity-80">
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                            <div className="flex items-center space-x-6">
-                              <div className="w-12 h-12 bg-surface-tertiary rounded-lg flex items-center justify-center shrink-0">
-                                <CheckCircle2 className="w-6 h-6 text-tertiary" />
-                              </div>
-                              <div>
-                                <h4 className="text-label font-bold text-primary">{trip.from} ? {trip.to}</h4>
-                                <div className="text-body-xs text-secondary">
-                                  {trip.date} ? {trip.operator} ? {trip.price.toLocaleString()} CDF
-                                </div>
-                              </div>
-                            </div>
-
-                            <Button variant="outline" size="sm" className="btn-ghost" onClick={() => {
-                              setActiveTab('ratings');
-                              setSelectedTripToRate(trip);
-                              setShowRatingModal(true);
-                            }}>
-                              <Star className="w-4 h-4 mr-2" />
-                              Noter
+                      if (upcomingTickets.length === 0) {
+                        return (
+                          <div className="p-12 text-center text-secondary">
+                            <MapPin className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                            <p>Aucun voyage confirmé à venir.</p>
+                            <Button
+                              variant="link"
+                              className="text-kongo-lime-dark font-bold mt-2"
+                              onClick={() => onPageChange?.('search')}
+                            >
+                              Réserver un nouveau trajet
                             </Button>
                           </div>
+                        );
+                      }
+
+                      return (
+                        <div className="divide-y divide-border-primary">
+                          {upcomingTickets.map((ticket) => {
+                            const tripsData = ticket.trips as any;
+                            const origin = tripsData?.origin?.name || 'Départ';
+                            const destination = tripsData?.destination?.name || 'Arrivée';
+                            const depTime = tripsData?.departure_time
+                              ? new Date(tripsData.departure_time)
+                              : null;
+                            return (
+                              <div key={ticket.id} className="p-6 hover:bg-surface-secondary transition-colors group">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                  <div className="flex items-center space-x-6">
+                                    <div className="w-16 h-16 bg-kongo-lime rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                      <MapPin className="w-8 h-8 text-kongo-black" />
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center space-x-2 mb-1">
+                                        <h4 className="text-h5 font-bold text-primary">{origin} → {destination}</h4>
+                                        <Badge className="status-kongo">Confirmé</Badge>
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-body-small text-secondary">
+                                        {depTime && (
+                                          <>
+                                            <span className="flex items-center"><Calendar className="w-3 h-3 mr-1" /> {depTime.toLocaleDateString('fr-FR')}</span>
+                                            <span className="flex items-center"><Clock className="w-3 h-3 mr-1" /> {depTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                          </>
+                                        )}
+                                        <span className="flex items-center font-mono"><Ticket className="w-3 h-3 mr-1" /> {ticket.booking_code}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center space-x-3">
+                                    <div className="text-right mr-2">
+                                      <p className="text-label font-black text-kongo-black">
+                                        {new Intl.NumberFormat('fr-CD', { style: 'currency', currency: ticket.currency || 'CDF', maximumFractionDigits: 0 }).format(Number(ticket.total_price || 0))}
+                                      </p>
+                                    </div>
+                                    <Button variant="ghost" size="sm" className="btn-ghost">
+                                      <Download className="w-4 h-4 mr-2" />
+                                      PDF
+                                    </Button>
+                                    <Button className="btn-secondary">
+                                      <Eye className="w-4 h-4 mr-2" />
+                                      Détails
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
-              </motion.div>
-            )}
+            </motion.div>
           </TabsContent>
 
 
@@ -1268,9 +1235,32 @@ export function UserDashboard({
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
-            <h2 className="text-h3 font-bold text-primary">Paramètres</h2>
+            <h2 className="text-h3 font-bold text-primary">Paramètres du compte</h2>
             <p className="text-body text-secondary">Configurez votre compte et vos préférences.</p>
-            {/* Settings content would go here */}
+
+            {/* Zone danger - Suppression de compte */}
+            <div className="mt-8 border-2 border-red-200 rounded-2xl p-6 bg-red-50">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-red-800 mb-1">Zone de danger</h3>
+                  <p className="text-sm text-red-700 mb-4">
+                    La suppression de votre compte est <strong>définitive et irréversible</strong>.
+                    Toutes vos données (réservations, avis, points de fidélité) seront supprimées.
+                  </p>
+                  <Button
+                    onClick={() => setShowDeleteAccountDialog(true)}
+                    style={{ backgroundColor: '#DC2626', color: '#FFFFFF' }}
+                    className="bg-[#DC2626] text-white hover:bg-red-700 border-2 border-red-800 font-black text-base px-6 py-3.5 rounded-xl shadow-lg flex items-center gap-2"
+                  >
+                    <Trash2 className="w-5 h-5 text-white" />
+                    <span className="text-white font-black text-base">Supprimer mon compte</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
@@ -1281,7 +1271,7 @@ export function UserDashboard({
           <Dialog open={showRatingModal} onOpenChange={setShowRatingModal}>
             <DialogContent className="sm:max-w-4xl">
               <DialogHeader>
-                <DialogTitle>Évaluez votre voyage</DialogTitle>
+                <DialogTitle>Ã‰valuez votre voyage</DialogTitle>
                 <DialogDescription>
                   Votre avis aide d'autres voyageurs ? faire le bon choix
                 </DialogDescription>
@@ -1304,8 +1294,12 @@ export function UserDashboard({
           <UserPreferencesManager
             onClose={() => setShowPreferences(false)}
             onPreferenceChange={(key, value) => {
-              console.log('Preference updated:', key, value);
+              void value;
               toast.success(`Paramètre ${key} mis à jour !`);
+            }}
+            onOpenDeleteAccount={() => {
+              setShowPreferences(false);
+              setShowDeleteAccountDialog(true);
             }}
           />
         )}
@@ -1320,9 +1314,20 @@ export function UserDashboard({
           />
         )}
       </AnimatePresence>
+      {/* Delete Account Dialog */}
+      <DeleteAccountDialog
+        isOpen={showDeleteAccountDialog}
+        onClose={() => setShowDeleteAccountDialog(false)}
+        onAccountDeleted={() => {
+          setShowDeleteAccountDialog(false);
+          // Redirect vers la page d'accueil après suppression
+          if (onPageChange) onPageChange('home');
+        }}
+      />
     </div>
   );
 }
+
 
 
 

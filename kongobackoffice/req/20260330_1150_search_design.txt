@@ -1,0 +1,24 @@
+# 📜 [Agent Archiviste] - Log de Session 2026-03-30_1150
+
+## 🎯 Demande Utilisateur
+Appliquer le design d'une nouvelle maquette sur l'affichage des résultats de recherche des trajets.
+
+## 🛠️ Travail Effectué
+
+### Refonte de `SearchResults.tsx`
+- **Re-structuration de la Card :** Refonte totale de la disposition de la carte de trajet dans le composant `SearchResults.tsx` pour refléter l'image fournie.
+- **Ajouts et Modifications UI :**
+  - Section informations détaillées du trajet (départ, heure, ligne de trajet `duration`, arrivée).
+  - Listage horizontal pour les arrêts.
+  - Maquette intégrée point par point pour le « Trajet multi-étapes » incluant la sous-liste des itinéraires et les « points d'intérêt ».
+  - Repositionnement de la note aux étoiles, du badge "Live", des sièges restants.
+  - Refonte visuelle de l'encart d'alerte de prix.
+  - Agrandissement du bouton d'action principal et de l'affichage du prix pour s'aligner sur la direction visuelle premium.
+- L'utilisation de classes Tailwind pures garantit une excellente intégration avec l'architecture en place.
+
+## 📂 Fichiers Modifiés
+- `src/components/SearchResults.tsx`
+- `replace.js` (script d'automatisation temporaire)
+
+## ✅ Statut
+L'affichage des cartes correspond à présent rigoureusement au modèle envoyé par l'utilisateur (disposition, indications visuelles, alertes, etc.). Le projet est prêt à être vérifié en direct sur `npm run dev`.

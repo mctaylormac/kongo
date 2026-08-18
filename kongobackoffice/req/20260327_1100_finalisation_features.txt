@@ -1,0 +1,37 @@
+# 📜 [Agent Archiviste] - Log de Session 2026-03-27_1100
+
+## 🎯 Demande Utilisateur
+Extension des fonctionnalités de KonGO :
+1. Gestion des arrêts par province dans le dashboard agence et utilisateur.
+2. Mise en place d'une tarification dynamique basée sur l'âge (catégories de passagers).
+3. Intégration de la sélection d'arrêts spécifiques lors de la recherche.
+4. Calcul automatique du prix remisé lors du paiement.
+
+## 🛠️ Travail Effectué
+
+### 1. Dashboard Agence (`AgencyDashboard.tsx`)
+- Ajout des onglets **Arrêts** et **Tarifs par Âge**.
+- Intégration des formulaires de création (`AddStopForm`, `AddAgeCategoryForm`).
+- Récupération en temps réel des arrêts et catégories depuis Supabase.
+
+### 2. Dashboard Utilisateur (`UserDashboard.tsx`)
+- Ajout d'un onglet **Arrêts** permettant de consulter les points de d'embarquement/débarquement par province (Cascade : Sélection Province -> Liste Arrêts).
+- Style premium et responsive respectant la charte KonGO.
+
+### 3. Moteur de Recherche (`SearchResults.tsx`)
+- Mise à jour du widget de recherche pour inclure la sélection d'arrêts (Optionnels) filtrés par la ville de départ/arrivée choisie.
+- Logique de fetch automatique des arrêts lors du changement de ville.
+
+### 4. Flux de Paiement (`PaymentFlow.tsx`)
+- Récupération des catégories d'âge au chargement.
+- Ajout d'une section "Configuration des passagers" permettant d'assigner une catégorie (Adulte, Enfant, Bébé) à chaque siège sélectionné.
+- Recalcul dynamique du sous-total et du total en appliquant les remises (`discount_percentage`) de chaque catégorie.
+
+## 📂 Fichiers Modifiés
+- `src/components/admin/AgencyDashboard.tsx`
+- `src/components/UserDashboard.tsx`
+- `src/components/SearchResults.tsx`
+- `src/components/PaymentFlow.tsx`
+
+## ✅ Statut
+Toutes les tâches prévues dans `prompte2.md` sont terminées et intégrées. L'infrastructure est prête pour les tests de bout en bout.

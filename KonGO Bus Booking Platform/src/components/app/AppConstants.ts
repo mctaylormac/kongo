@@ -11,14 +11,7 @@ export const NAVIGATION_PAGES = {
   DASHBOARD: 'dashboard',
   AGENCIES: 'agencies',
   LOGIN: 'login',
-  SIGNUP: 'signup',
-  ADMIN_DASHBOARD: 'admin-dashboard',
-  ADMIN_BUSES: 'admin-buses',
-  ADMIN_TRIPS: 'admin-trips',
-  ADMIN_BOOKINGS: 'admin-bookings',
-  ADMIN_AGENCIES: 'admin-agencies',
-  ADMIN_CLIENTS: 'admin-clients',
-  ADMIN_LOGIN: 'admin-login'
+  SIGNUP: 'signup'
 } as const;
 
 // Booking flow pages - constante manquante

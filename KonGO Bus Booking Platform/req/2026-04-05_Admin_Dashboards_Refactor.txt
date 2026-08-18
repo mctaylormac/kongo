@@ -1,0 +1,31 @@
+# ROLE: META-AGENT (ORCHESTRATEUR) & AGENT ARCHIVISTE
+# DATE : 2026-04-05
+
+## DEMANDE INITIALE ET CONTEXTE
+Refonte de l'architecture et UI/UX Backoffice (Agence, Superuser, Cashier, Driver) selon la skill `ui-ux-pro-max`, pour l'usage du système KonGO :
+- Séparation physique : un dossier `kongobackoffice` distinct de `KonGO Bus Booking Platform`.
+- Refonte des Sidebars : options de menu latéral distinctes selon les rôles.
+  - Cashier: "Tableau de Bord", "Nouvelle Réservation", "Historique".
+  - Agency: "Bus", "Voyages", "Sites", "Equipe", "Bookings", "Revenus".
+  - Superuser: "Vue d'Ensemble", "Agences", "Bus Total", "Voyages", "Réservations", "Clients", "Chauffeurs".
+- Résolution des bugs de compilation et typage stricts (Typescript & JSX) notamment sur le `CashierDashboard`.
+
+## ACTIONS ACCOMPLIES
+1. **[Agent Dev Web & Brainstorming]** : 
+   - Migration complète vers une navigation par Hash pour l'intérieur des dashboards (ex. `#agencies`, `#new`, `#history`) ou par page pour les vues indépendantes pour garantir de ne plus rafraîchir la page ou de perdre la navigation.
+2. **[Agent Stitch / UI-UX]** : 
+   - Application d'un Glassmorphism Premium sur toutes les sections.
+   - Restructuration des interfaces `CashierDashboard` en retirant les tabs supérieures internes au profit du contrôle exclusif par le `DashboardLayout` via le système de hash.
+3. **[Agent QA & Sécurité]** :
+   - Parcours de tout le fichier `CashierDashboard.tsx` pour éliminer les coquilles `activeTab === 'booking'` et le remplacer explicitement par `'new'` conformément au plan unifiant la navigation. 
+   - Exécution de `npx tsc --noEmit` et démarrage du `Vite Server` sans erreur fatale, assurant l'intégrité de l'application React.
+
+## FICHIERS IMPACTÉS (EXHAUSTIF)
+- `C:\web\meji\kongo\kongobackoffice\src\components\admin\CashierDashboard.tsx`
+- `C:\web\meji\kongo\kongobackoffice\src\components\admin\AgencyDashboard.tsx`
+- `C:\web\meji\kongo\kongobackoffice\src\components\admin\SuperuserDashboard.tsx`
+- `C:\web\meji\kongo\kongobackoffice\src\components\admin\DashboardLayout.tsx`
+- `C:\web\meji\kongo\kongobackoffice\src\components\app\PageRenderer.tsx`
+
+## ÉTAT ACTUEL : GREEN LIGHT
+Système stable, design validé en pré-production, menu latéral pleinement synchrone.

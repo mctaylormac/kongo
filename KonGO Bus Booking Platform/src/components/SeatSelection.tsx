@@ -69,37 +69,82 @@ export function SeatSelection({ trip, passengers, onContinue, onBack, preference
   const [isLoading, setIsLoading] = useState(true);
   const [selectedWagon, setSelectedWagon] = useState<number>(1);
   const [wagons, setWagons] = useState<TrainWagon[]>([]);
+  // [Agent Dev Web] - Action: Séparation occupé (payé) vs réservé (en attente) pour affichage différencié
   const [dbOccupiedSeats, setDbOccupiedSeats] = useState<string[]>([]);
+  const [dbReservedSeats, setDbReservedSeats] = useState<string[]>([]);
   
   const isTrainTrip = trip?.vehicleType === 'train' || trip?.trainType;
 
-  // Fetch real occupied seats from DB
+  // [Agent Dev Web] - Action: Fetch corrigé en 2 étapes pour éviter le bug de filtrage Supabase sur les joins
+  // Distingue occupé (payé/confirmé = ROUGE) vs réservé (en attente = ORANGE)
   useEffect(() => {
     if (!trip?.id) return;
     
     const fetchOccupiedSeats = async () => {
       try {
-        const { data, error } = await supabase
+        // Étape 1 : Récupérer tous les bookings du voyage, groupés par statut
+        const { data: bookingsData, error: bookingsError } = await supabase
           .from('bookings')
-          .select('seats')
+          .select('id, status')
           .eq('trip_id', trip.id)
-          .in('status', ['confirmed', 'paid', 'pending']);
-          
-        if (error) throw error;
-        
-        const occupiedIds: string[] = [];
-        if (data) {
-          data.forEach(booking => {
-            if (Array.isArray(booking.seats)) {
-              booking.seats.forEach((seat: any) => {
-                if (typeof seat === 'string') occupiedIds.push(seat);
-                else if (seat && seat.id) occupiedIds.push(seat.id);
-                else if (seat && seat.seatNumber) occupiedIds.push(seat.seatNumber);
-              });
-            }
-          });
+          .in('status', ['confirmed', 'paid', 'pending', 'completed', 'success']);
+
+        if (bookingsError) throw bookingsError;
+        if (!bookingsData || bookingsData.length === 0) {
+          setDbOccupiedSeats([]);
+          setDbReservedSeats([]);
+          return;
         }
-        setDbOccupiedSeats(occupiedIds);
+
+        const confirmedIds = bookingsData
+          .filter(b => ['confirmed', 'paid', 'success', 'completed'].includes(b.status))
+          .map(b => b.id);
+        const pendingIds = bookingsData
+          .filter(b => b.status === 'pending')
+          .map(b => b.id);
+
+        // Étape 2a : Sièges occupés (via booking_seats, puis fallback JSON)
+        let occupiedSeats: string[] = [];
+        if (confirmedIds.length > 0) {
+          const { data: occupiedData } = await supabase
+            .from('booking_seats').select('seat_number').in('booking_id', confirmedIds);
+          if (occupiedData && occupiedData.length > 0) {
+            occupiedSeats = occupiedData.map(s => s.seat_number);
+          } else {
+            const { data: legacyData } = await supabase
+              .from('bookings').select('seats').in('id', confirmedIds);
+            if (legacyData) {
+              occupiedSeats = legacyData.flatMap(b =>
+                Array.isArray(b.seats) ? b.seats.map((s: any) =>
+                  typeof s === 'string' ? s : (s.id || s.seatNumber || '')
+                ) : []
+              ).filter(Boolean);
+            }
+          }
+        }
+
+        // Étape 2b : Sièges réservés (en attente paiement)
+        let reservedSeats: string[] = [];
+        if (pendingIds.length > 0) {
+          const { data: reservedData } = await supabase
+            .from('booking_seats').select('seat_number').in('booking_id', pendingIds);
+          if (reservedData && reservedData.length > 0) {
+            reservedSeats = reservedData.map(s => s.seat_number);
+          } else {
+            const { data: legacyData } = await supabase
+              .from('bookings').select('seats').in('id', pendingIds);
+            if (legacyData) {
+              reservedSeats = legacyData.flatMap(b =>
+                Array.isArray(b.seats) ? b.seats.map((s: any) =>
+                  typeof s === 'string' ? s : (s.id || s.seatNumber || '')
+                ) : []
+              ).filter(Boolean);
+            }
+          }
+        }
+
+        setDbOccupiedSeats(occupiedSeats);
+        setDbReservedSeats(reservedSeats.filter(s => !occupiedSeats.includes(s)));
       } catch (err) {
         console.error('Error fetching seats', err);
       }
@@ -107,19 +152,20 @@ export function SeatSelection({ trip, passengers, onContinue, onBack, preference
     
     fetchOccupiedSeats();
 
-    // Subscribe to realtime changes
+    // Temps réel : écoute booking_seats ET bookings
     const channel = supabase
       .channel(`seats_updates_${trip.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'bookings', filter: `trip_id=eq.${trip.id}` },
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'booking_seats' },
+        () => fetchOccupiedSeats()
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings', filter: `trip_id=eq.${trip.id}` },
         () => fetchOccupiedSeats()
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [trip?.id]);
 
   // Generate seat layout based on vehicle type
@@ -134,18 +180,23 @@ export function SeatSelection({ trip, passengers, onContinue, onBack, preference
 
     const generateBusLayout = () => {
       const seats: Seat[] = [];
-      const totalRows = 14;
+      // [Agent Dev Web] - Action: Utilisation de total_seats défini par l'agence comme source de vérité
+      const capacity = trip?.totalSeats || trip?.total_seats || 45; 
+      const totalRows = Math.ceil(capacity / 4);
       const columns = ['A', 'B', 'C', 'D'];
       
       for (let row = 1; row <= totalRows; row++) {
         for (let colIndex = 0; colIndex < 4; colIndex++) {
+          if (seats.length >= capacity) break;
+          
           const column = columns[colIndex];
           const isWindow = colIndex === 0 || colIndex === 3;
           const isPremium = row <= 3;
           const isDisabled = row === 1 && column === 'A';
           const seatId = `${row}${column}`;
+          // [Agent Dev Web] - Action: Vérification dans les deux listes (occupé ET réservé)
           const isOccupied = dbOccupiedSeats.includes(seatId);
-          const isReserved = false;
+          const isReserved = dbReservedSeats.includes(seatId);
           
           seats.push({
             id: seatId,
@@ -325,7 +376,7 @@ export function SeatSelection({ trip, passengers, onContinue, onBack, preference
 
     const timer = setTimeout(generateLayout, 1000);
     return () => clearTimeout(timer);
-  }, [trip, isTrainTrip, selectedWagon, dbOccupiedSeats]);
+  }, [trip, isTrainTrip, selectedWagon, dbOccupiedSeats, dbReservedSeats]);
 
   // Update seats when wagon changes
   useEffect(() => {
@@ -585,7 +636,7 @@ export function SeatSelection({ trip, passengers, onContinue, onBack, preference
                   <div className="text-body-small text-secondary">À partir de</div>
                   <div className="text-h4 text-kongo-black font-bold">{formatPrice(trip?.price || 0)}</div>
                   <Badge className="status-success mt-1">
-                    {trip?.seatsAvailable || 25} {isTrainTrip ? 'places' : 'sièges'} disponibles
+                    {trip?.seatsAvailable || trip?.total_seats || 45} {isTrainTrip ? 'places' : 'sièges'} disponibles
                   </Badge>
                 </div>
               </div>

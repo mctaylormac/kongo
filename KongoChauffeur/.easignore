@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+.npm/
+.yarn/
+
+# System & Version Control
+.git/
+.gitignore
+.DS_Store
+Thumbs.db
+
+# Expo & Metro Build Outputs
+.expo/
+dist/
+build/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+
+# Native Builds & Certificates
+/ios
+/android
+.gradle/
+.kotlin/
+*.orig.*
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+*.tsbuildinfo
+
+# Archives & Large Files
+*.rar
+*.zip
+*.7z
+*.tar
+*.gz
+*.tgz
+*.iso
+*.dmg
+*.apk
+*.aab
+*.ipa
+
+# Documents & PDFs
+*.pdf
+*.docx
+*.doc
+*.xlsx
+*.pptx
+*.txt
+
+# Screenshots & Non-app Media (keep assets/)
+image/
+Image/
+screenshots/
+docs/
+
+# Environment & Debug
+.env*.local
+npm-debug.*
+yarn-debug.*
+yarn-error.*

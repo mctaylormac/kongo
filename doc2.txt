@@ -1,0 +1,100 @@
+PARTIE 2 : MATRICE DES ASSETS GRAPHIQUES REQUIS (NORMES 2026)
+Tous les fichiers visuels doivent respecter strictement les dimensions listées sous peine de rejet immédiat par les API de validation automatique de Google Play Console et App Store Connect.
+
+2.1 Identité Visuelle de l'Application
+Asset	Plateforme	Dimensions Fixes	Format Requis	Contraintes Spécifiques
+Icône App Store	iOS	1024 × 1024 px	PNG	Pas de transparence (Flattened), profil sRGB.
+Icône Google Play	Android	512 × 512 px	PNG (32-bit)	Transparence acceptée, max 1024 KB.
+Graphique Descriptif	Android	1024 × 500 px	JPEG ou PNG (24-bit)	Obligatoire pour le Play Store. Pas d'alpha.
+2.2 Captures d'Écran Requises (Screenshots)
+🍏 Apple App Store Connect
+L'App Store applique une politique de mise à l'échelle. Pour 2026, la soumission de la taille 6.9 pouces est devenue la norme principale pour éviter tout flou sur les derniers flagships (générations iPhone 16 Pro Max / 17 Pro Max).
+
+Quantité par langue : Minimum 1, Maximum 10 captures.
+
+Format : PNG ou JPEG, strictement sans transparence, profil de couleurs RVB.
+
+Barre de statut : Évitez d'afficher un niveau de batterie faible ou des noms d'opérateurs réels. Privilégiez une barre épurée.
+
+Classe d'affichage	Dimensions Portrait	Dimensions Paysage	Obligatoire ?
+iPhone 6.9" (Génération Récente)	1320 × 2868 px	2868 × 1320 px	Oui (Baseline 2026)
+iPhone 6.5" (Génération Legacy)	1284 × 2778 px	2778 × 1284 px	Optionnel (Si 6.9" fourni)
+iPad Pro 13" (Tablette M4)	2064 × 2752 px	2752 × 2064 px	Oui (Seulement si l'app cible l'iPad)
+
+Icône de l'application : 1024 x 1024 px (gérée automatiquement via l'asset d'Expo si bien configurée).
+
+⚠️ Règle critique : La barre de statut sur les captures d'écran doit être "propre" (pas de batterie faible, pas de logo d'opérateur mobile réel, heure fictive).
+
+🤖 Google Play Console
+Google est plus flexible sur les résolutions exactes mais impose des ratios fixes.
+
+Quantité par type d'appareil : Minimum 2, Maximum 8 captures.
+
+Format : JPEG ou PNG 24-bit (sans transparence). Max 8 Mo par image.
+
+Icône de l'application (Store) : 512 x 512 px (PNG 32-bit avec transparence, max 1024 Ko).
+
+Type d'appareil	Dimensions Recommandées	Ratio Toléré	Contraintes
+Téléphone Android	1080 × 1920 px (ou 1440×2560)	Entre 9:16 et 16:9	Côté min: 320px / Côté max: 3840px
+Tablette 7 pouces	1200 × 1920 px	9:16 ou 16:9	Recommandé pour éviter l'étirement des images
+Tablette 10 pouces	1920 × 1200 px	16:10 ou 10:16	Recommandé pour optimiser le taux de conversion
+📦 PARTIE 3 : WORKFLOW TECHNIQUE AVEC EAS (EXPO APPLICATION SERVICES)
+L'IA doit s'assurer que les outils en ligne de commande (CLI) d'Expo et EAS sont installés et connectés avant de lancer la suite d'instructions.
+
+3.1 Initialisation et Authentification
+Avant tout build, l'environnement doit être vérifié :
+
+Bash
+# Vérification de l'installation de la CLI EAS
+npm list -g eas-cli || npm install -g eas-cli
+
+# Connexion au compte Expo
+eas login
+3.2 Configuration du fichier eas.json
+Vérifiez que le profil production est correctement configuré pour générer un fichier .aab (Android App Bundle) pour Google et activer les optimisations de code :
+
+JSON
+{
+  "cli": {
+    "version": ">= 1.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "simulator": false
+      }
+    }
+  }
+}
+3.3 Commandes d'exécution pour l'IA
+Exécutez séquentiellement ces routines pour lancer la compilation sur les serveurs cloud d'Expo et automatiser la soumission vers les consoles de développement.
+
+Étape 1 : Compilation Multi-plateforme
+Bash
+eas build --platform all --profile production
+(Note : EAS demandera de vous connecter à vos comptes Apple Developer et Google Play Developer lors du premier lancement pour générer automatiquement les certificats de production et profils de provisionnement de manière sécurisée).
+
+Étape 2 : Soumission automatique aux Stores
+Une fois les builds terminés avec succès, soumettez les binaires vers les canaux de test interne ou de production :
+
+Bash
+eas submit --platform all
+Pour iOS : Le build apparaîtra sur TestFlight après quelques minutes de traitement par les serveurs d'Apple.
+
+Pour Android : Le bundle sera injecté dans la section Production ou Test Interne de la Google Play Console, prêt pour la configuration finale du questionnaire de l'application.
+
+🚨 CHECKLIST DE VÉRIFICATION AVANT SOUMISSION (À EXÉCUTER PAR L'IA)
+[ ] L'icône de l'application n'affiche aucune transparence sur iOS.
+
+[ ] Les variables versionCode (Android) et buildNumber (iOS) ont été incrémentées par rapport à la soumission précédente.
+
+[ ] Aucun asset graphique ne dépasse la taille critique limite (10 Mo pour l'App Store).
+
+[ ] La clé d'API de production pour l'accès aux bases de données tierces ou à Supabase est correctement injectée via les secrets EAS (eas secret:create).

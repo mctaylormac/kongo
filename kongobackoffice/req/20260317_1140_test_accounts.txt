@@ -1,0 +1,19 @@
+Date: 2026-03-17 11:40
+Utilisateur: macla
+Requête: Création de comptes de test (Superuser, Agence, Chauffeur) via SQL/Supabase.
+
+Travail effectué:
+1. Analyse de la structure des tables `public.profiles`, `public.agencies` et `public.drivers`.
+2. Identification de l'agence de test existante : "KonGO Premium" (`b82f0660-3631-4d62-8298-5b91a5639a69`).
+3. Création d'un script SQL de référence `supabase/create_test_accounts.sql` pour l'insertion des rôles.
+4. Note technique : L'insertion directe en base via SQL nécessite que les utilisateurs soient d'abord créés dans `auth.users` via l'interface Supabase ou l'API Auth pour respecter les contraintes de clé étrangère.
+
+Fichiers modifiés:
+- supabase/create_test_accounts.sql (Nouveau script)
+- req/20260317_1140_test_accounts.txt (Nouveau log)
+
+Statut: TERMINÉ. Script exécuté avec succès après correction des conflits de clé primaire via une approche DELETE/INSERT ciblée sur les vrais IDs.
+
+Fichiers modifiés:
+- supabase/create_test_accounts.sql (Correction de la logique d'insertion)
+- req/20260317_1140_test_accounts.txt (Mise à jour du log)

@@ -49,6 +49,7 @@ import {
 interface UserPreferencesManagerProps {
   onPreferenceChange?: (key: string, value: any) => void;
   onClose?: () => void;
+  onOpenDeleteAccount?: () => void;
   className?: string;
 }
 
@@ -138,6 +139,7 @@ interface UserPreferences {
 export function UserPreferencesManager({
   onPreferenceChange,
   onClose,
+  onOpenDeleteAccount,
   className = ""
 }: UserPreferencesManagerProps) {
   const [preferences, setPreferences] = useState<UserPreferences>({
@@ -400,30 +402,53 @@ export function UserPreferencesManager({
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         {/* Navigation des onglets */}
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6 h-auto p-1 bg-surface-secondary">
-          <TabsTrigger value="profile" className="flex items-center space-x-2 py-3">
-            <User className="w-4 h-4" />
-            <span className="hidden sm:inline">Profil</span>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 mb-8 h-auto p-2 bg-gray-100 border-2 border-gray-300 rounded-2xl shadow-inner gap-2">
+          <TabsTrigger
+            value="profile"
+            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-sm cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+          >
+            <User className="w-4 h-4 shrink-0" />
+            <span>Profil</span>
           </TabsTrigger>
-          <TabsTrigger value="travel" className="flex items-center space-x-2 py-3">
-            <Car className="w-4 h-4" />
-            <span className="hidden sm:inline">Voyage</span>
+
+          <TabsTrigger
+            value="travel"
+            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-sm cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+          >
+            <Car className="w-4 h-4 shrink-0" />
+            <span>Voyage</span>
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center space-x-2 py-3">
-            <Bell className="w-4 h-4" />
-            <span className="hidden sm:inline">Notifications</span>
+
+          <TabsTrigger
+            value="notifications"
+            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-sm cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+          >
+            <Bell className="w-4 h-4 shrink-0" />
+            <span>Notifications</span>
           </TabsTrigger>
-          <TabsTrigger value="ui" className="flex items-center space-x-2 py-3">
-            <Palette className="w-4 h-4" />
-            <span className="hidden sm:inline">Interface</span>
+
+          <TabsTrigger
+            value="ui"
+            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-sm cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+          >
+            <Palette className="w-4 h-4 shrink-0" />
+            <span>Interface</span>
           </TabsTrigger>
-          <TabsTrigger value="payment" className="flex items-center space-x-2 py-3">
-            <CreditCard className="w-4 h-4" />
-            <span className="hidden sm:inline">Paiement</span>
+
+          <TabsTrigger
+            value="payment"
+            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-sm cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+          >
+            <CreditCard className="w-4 h-4 shrink-0" />
+            <span>Paiement</span>
           </TabsTrigger>
-          <TabsTrigger value="ai" className="flex items-center space-x-2 py-3">
-            <Zap className="w-4 h-4" />
-            <span className="hidden sm:inline">IA</span>
+
+          <TabsTrigger
+            value="ai"
+            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 font-extrabold text-sm cursor-pointer shadow-md hover:bg-gray-200 hover:border-gray-400 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 data-[state=active]:bg-[#1D1D1F] data-[state=active]:text-[#C8E63C] data-[state=active]:border-2 data-[state=active]:border-[#C8E63C] data-[state=active]:shadow-xl"
+          >
+            <Zap className="w-4 h-4 shrink-0" />
+            <span>IA</span>
           </TabsTrigger>
         </TabsList>
 
@@ -515,6 +540,33 @@ export function UserPreferencesManager({
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Zone de Danger - Suppression du Compte */}
+          <Card className="border-2 border-red-200 bg-red-50/70 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center space-x-3 text-red-800 font-bold">
+                <Trash2 className="w-5 h-5 text-red-600" />
+                <span>Zone de danger - Suppression de compte</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-red-700 leading-relaxed">
+                La suppression de votre compte est <strong>définitive et irréversible</strong>.
+                Toutes vos données (réservations, avis publiés, points de fidélité) seront définitivement supprimées de KonGO.
+              </p>
+              <Button
+                type="button"
+                onClick={() => {
+                  if (onOpenDeleteAccount) onOpenDeleteAccount();
+                }}
+                style={{ backgroundColor: '#DC2626', color: '#FFFFFF' }}
+                className="bg-[#DC2626] text-white hover:bg-red-700 border-2 border-red-800 font-black text-base px-6 py-3.5 rounded-xl shadow-lg flex items-center gap-2"
+              >
+                <Trash2 className="w-5 h-5 text-white" />
+                <span className="text-white font-black text-base">Supprimer mon compte définitivement</span>
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

@@ -1,0 +1,13 @@
+# 🤖 SESSION LOG - 2026-04-10 10:45
+
+## 🎛️ Résumé des Actions
+- [Agent Archiviste] Initialisation de la session pour la synchronisation des sièges.
+- [Agent Dev Web] Modification de `SeatSelection.tsx` : la grille de sélection des sièges pour les bus est désormais dynamique.
+- [Agent Dev Web] Calcul des rangées basé sur `trip.total_seats` (ou 45 par défaut) et limitation du nombre de sièges générés.
+- [Agent Dev Web] Mise à jour de l'affichage de la capacité disponible pour utiliser la donnée dynamique.
+
+## 📁 Fichiers Modifiés
+- `c:\web\meji\kongo\KonGO Bus Booking Platform\src\components\SeatSelection.tsx`
+
+## ✅ Statut : TERMINE
+La sélection des sièges dans le Dashboard Caissier correspond maintenant exactement à la capacité réelle du bus enregistré pour le voyage.

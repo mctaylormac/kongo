@@ -1,0 +1,30 @@
+Session: 20260318_0930
+Agent: Archiviste (Coordination: Antigravity)
+
+TACHES EFFECTUEES:
+-----------------
+1. [Agent Dev Web & Supabase] - Ajout de la gestion des comptes admins d'agence.
+   - Création du composant AddAgencyAdminForm dans AdminForms.tsx.
+   - Ajout d'un bouton "Créer Admin" dans le SuperuserDashboard.tsx.
+   - Logique initiale pour la création d'utilisateurs via signUp (Role: agency).
+
+2. [Agent Dev Web] - Ajout du nom de l'agence sur le ticket.
+   - Modification de TripConfirmation.tsx pour utiliser les données réelles de l'agence du trajet.
+   - Mise à jour du header du ticket numérique pour afficher "Opéré par [Nom Agence]".
+
+3. [Agent Dev Web & Sécurité] - Sécurisation du processus de réservation.
+   - Ajout d'une vérification de rôle dans SearchResults.tsx.
+   - Les utilisateurs "guest" ne peuvent plus réserver et sont invités à se connecter via un toast interactif.
+
+4. [Agent Dev Web] - Correction de la réinitialisation des filtres de recherche.
+   - Création d'une fonction resetAllFilters dans SearchResults.tsx.
+   - Le bouton "Réinitialiser" du haut et le bouton "Rechercher" appellent maintenant resetAllFilters pour un état propre.
+
+FICHIERS MODIFIES:
+------------------
+- c:\web\meji\kongo\KonGO Bus Booking Platform\src\components\admin\AdminForms.tsx
+- c:\web\meji\kongo\KonGO Bus Booking Platform\src\components\admin\SuperuserDashboard.tsx
+- c:\web\meji\kongo\KonGO Bus Booking Platform\src\components\TripConfirmation.tsx
+- c:\web\meji\kongo\KonGO Bus Booking Platform\src\components\SearchResults.tsx
+
+STATUS: TERMINÉ (sauf QA manuel)

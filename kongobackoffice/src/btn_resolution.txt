@@ -1,0 +1,7 @@
+J'ai corrigé les boutons "Créer & Continuer" et "Suivant" en utilisant une méthode radicale : l'injection de styles en ligne (inline styles). Cela garantit que le fond sera noir et le texte blanc, peu importe les conflits de classes CSS ou les problèmes de compilation Tailwind.
+
+🛠️ Résumé des actions :
+Style Forcé : Ajout de style={{ backgroundColor: 'black', color: 'white' }} directement sur les deux boutons dans CashierDashboard.tsx.
+Correction Globale : J'ai également mis à jour le composant de base Button (src/components/ui/button.tsx) pour remplacer les classes slate (qui manquaient dans votre thème CSS) par des classes gray et black fonctionnelles.
+Gestion d'état : Le bouton "Suivant" devient gris clair (#ccc) lorsqu'il est désactivé (quand aucun client n'est sélectionné) pour rester compréhensible, puis devient noir dès qu'un client est choisi.
+Ces boutons devraient maintenant être parfaitement visibles et lisibles.

@@ -1,8 +1,8 @@
-import { Suspense, lazy } from "react";
-import { motion } from "motion/react";
+import { Suspense, lazy, useEffect } from "react";
 import { NAVIGATION_PAGES } from './AppConstants';
 import { ComponentLoadingFallback } from './AppComponents';
-import { createDemoTrip } from './AppConstants';
+import type { FavoriteRoute, SearchParams } from './AppTypes';
+import type { PageProps } from './AppHelpers';
 
 // Lazy load main page components
 const SearchResults = lazy(() => import("../SearchResults").then(module => ({ default: module.SearchResults })));
@@ -15,37 +15,21 @@ const AgencyDirectory = lazy(() => import("../AgencyDirectory").then(module => (
 const LoginPage = lazy(() => import("../LoginPage").then(module => ({ default: module.LoginPage })));
 const SignupPage = lazy(() => import("../SignupPage").then(module => ({ default: module.SignupPage })));
 
-// Admin Pages
-const AdminDashboard = lazy(() => import("../admin/AdminDashboard").then(module => ({ default: module.AdminDashboard })));
-const SuperuserDashboard = lazy(() => import("../admin/SuperuserDashboard").then(module => ({ default: module.SuperuserDashboard })));
-const AgencyDashboard = lazy(() => import("../admin/AgencyDashboard").then(module => ({ default: module.AgencyDashboard })));
-const DriverDashboard = lazy(() => import("../admin/DriverDashboard").then(module => ({ default: module.DriverDashboard })));
-const ChefDashboard = lazy(() => import("../admin/ChefDashboard").then(module => ({ default: module.ChefDashboard })));
-const BusManagement = lazy(() => import("../admin/BusManagement").then(module => ({ default: module.BusManagement })));
-const TripManagement = lazy(() => import("../admin/TripManagement").then(module => ({ default: module.TripManagement })));
-const BookingManagement = lazy(() => import("../admin/BookingManagement").then(module => ({ default: module.BookingManagement })));
-const AgencyManagement = lazy(() => import("../admin/AgencyManagement").then(module => ({ default: module.AgencyManagement })));
-const ClientManagement = lazy(() => import("../admin/ClientManagement").then(module => ({ default: module.ClientManagement })));
-const CashierDashboard = lazy(() => import("../admin/CashierDashboard").then(module => ({ default: module.CashierDashboard })));
-const AdminLoginPage = lazy(() => import("../admin/AdminLoginPage").then(module => ({ default: module.AdminLoginPage })));
-
-// Home page components - load directly for better performance
+// Home page components
 import { HeroSection } from "../HeroSection";
-import { USPSection } from "../USPSection";
 
 // Lazy load home page sections
 const DestinationsCarousel = lazy(() => import("../DestinationsCarousel").then(module => ({ default: module.DestinationsCarousel })));
+const USPSection = lazy(() => import("../USPSection").then(module => ({ default: module.USPSection })));
 const HowItWorksSection = lazy(() => import("../HowItWorksSection").then(module => ({ default: module.HowItWorksSection })));
-const LoyaltyProgramSection = lazy(() => import("../LoyaltyProgramSection").then(module => ({ default: module.LoyaltyProgramSection })));
 const PartnersSection = lazy(() => import("../PartnersSection").then(module => ({ default: module.PartnersSection })));
-const ReviewsSection = lazy(() => import("../ReviewsSection").then(module => ({ default: module.ReviewsSection })));
 const AppDownloadSection = lazy(() => import("../AppDownloadSection").then(module => ({ default: module.AppDownloadSection })));
 
 interface PageRendererProps {
   currentPage: string;
-  pageProps: any;
-  onSearch: (params: any) => void;
-  favoriteRoutes: any[];
+  pageProps: PageProps;
+  onSearch: (params: SearchParams) => void;
+  favoriteRoutes: FavoriteRoute[];
 }
 
 export function PageRenderer({ currentPage, pageProps, onSearch, favoriteRoutes }: PageRendererProps) {
@@ -60,13 +44,19 @@ export function PageRenderer({ currentPage, pageProps, onSearch, favoriteRoutes 
     case NAVIGATION_PAGES.SEATS:
       return (
         <Suspense fallback={<ComponentLoadingFallback />}>
-          <SeatSelection
-            trip={pageProps.selectedTrip || createDemoTrip()}
-            passengers={pageProps.passengers}
-            onContinue={pageProps.onContinue}
-            onBack={pageProps.onBack}
-            preferences={pageProps.preferences}
-          />
+          {pageProps.selectedTrip ? (
+            <SeatSelection
+              trip={pageProps.selectedTrip}
+              passengers={pageProps.passengers}
+              onContinue={pageProps.onContinue}
+              onBack={pageProps.onBack}
+              preferences={pageProps.preferences}
+            />
+          ) : (
+            <BookingFlowRedirect
+              onRedirect={() => pageProps.onPageChange(NAVIGATION_PAGES.SEARCH)}
+            />
+          )}
         </Suspense>
       );
 
@@ -74,6 +64,7 @@ export function PageRenderer({ currentPage, pageProps, onSearch, favoriteRoutes 
       return (
         <Suspense fallback={<ComponentLoadingFallback />}>
           <BaggageWeightCalculator
+            trip={pageProps.selectedTrip}
             passengers={pageProps.passengers}
             onBaggageUpdate={(baggage, totalCost) => {
               pageProps.onBaggageUpdate(baggage, totalCost);
@@ -90,6 +81,7 @@ export function PageRenderer({ currentPage, pageProps, onSearch, favoriteRoutes 
           <PaymentFlow
             trip={pageProps.selectedTrip}
             seats={pageProps.selectedSeats}
+            baggageData={pageProps.baggageData}
             searchParams={pageProps.searchParams}
             onPaymentComplete={pageProps.onPaymentComplete}
             onBack={pageProps.onBack}
@@ -142,153 +134,45 @@ export function PageRenderer({ currentPage, pageProps, onSearch, favoriteRoutes 
         </Suspense>
       );
 
-    case NAVIGATION_PAGES.ADMIN_LOGIN:
-      return (
-        <Suspense fallback={<ComponentLoadingFallback />}>
-          <AdminLoginPage {...pageProps} />
-        </Suspense>
-      );
-
-    case NAVIGATION_PAGES.ADMIN_DASHBOARD:
-      return (
-        <Suspense fallback={<ComponentLoadingFallback />}>
-          {pageProps.userRole === 'superuser' && <SuperuserDashboard {...pageProps} />}
-          {pageProps.userRole === 'agency' && <AgencyDashboard {...pageProps} />}
-          {pageProps.userRole === 'chef' && <ChefDashboard {...pageProps} />}
-          {pageProps.userRole === 'driver' && <DriverDashboard {...pageProps} />}
-          {pageProps.userRole === 'cashier' && <CashierDashboard {...pageProps} />}
-          {(!pageProps.userRole || pageProps.userRole === 'guest') && <AdminDashboard {...pageProps} />}
-        </Suspense>
-      );
-
-    case NAVIGATION_PAGES.ADMIN_BUSES:
-      return (
-        <Suspense fallback={<ComponentLoadingFallback />}>
-          <BusManagement {...pageProps} />
-        </Suspense>
-      );
-
-    case NAVIGATION_PAGES.ADMIN_TRIPS:
-      return (
-        <Suspense fallback={<ComponentLoadingFallback />}>
-          <TripManagement {...pageProps} />
-        </Suspense>
-      );
-
-    case NAVIGATION_PAGES.ADMIN_BOOKINGS:
-      return (
-        <Suspense fallback={<ComponentLoadingFallback />}>
-          <BookingManagement {...pageProps} />
-        </Suspense>
-      );
-
-    case NAVIGATION_PAGES.ADMIN_AGENCIES:
-      return (
-        <Suspense fallback={<ComponentLoadingFallback />}>
-          <AgencyManagement {...pageProps} />
-        </Suspense>
-      );
-
-    case NAVIGATION_PAGES.ADMIN_CLIENTS:
-      return (
-        <Suspense fallback={<ComponentLoadingFallback />}>
-          <ClientManagement {...pageProps} />
-        </Suspense>
-      );
-
     default:
       return <HomePage onSearch={onSearch} favoriteRoutes={favoriteRoutes} />;
   }
 }
 
-// Home page component with all sections
-function HomePage({ onSearch, favoriteRoutes }: { onSearch: (params: any) => void; favoriteRoutes: any[] }) {
+function BookingFlowRedirect({ onRedirect }: { onRedirect: () => void }) {
+  useEffect(() => {
+    onRedirect();
+  }, [onRedirect]);
+
+  return <ComponentLoadingFallback />;
+}
+
+// Home page component with the simplified public booking path
+function HomePage({ onSearch, favoriteRoutes }: { onSearch: (params: SearchParams) => void; favoriteRoutes: FavoriteRoute[] }) {
   return (
     <div className="space-y-0">
-      {/* Hero Section - Always visible */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2, duration: 0.8 }}
-      >
-        <HeroSection onSearch={onSearch} />
-      </motion.div>
-
-      {/* USP Section - Critical above fold */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-100px" }}
-        transition={{ duration: 0.8, delay: 0.1 }}
-      >
-        <USPSection />
-      </motion.div>
+      {/* Hero Section */}
+      <HeroSection onSearch={onSearch} />
 
       {/* Lazy loaded sections */}
       <Suspense fallback={<ComponentLoadingFallback className="py-24" />}>
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-        >
-          <DestinationsCarousel favoriteRoutes={favoriteRoutes} />
-        </motion.div>
+        <DestinationsCarousel favoriteRoutes={favoriteRoutes} />
       </Suspense>
 
       <Suspense fallback={<ComponentLoadingFallback className="py-24" />}>
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-        >
-          <HowItWorksSection />
-        </motion.div>
+        <USPSection />
       </Suspense>
 
       <Suspense fallback={<ComponentLoadingFallback className="py-24" />}>
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-        >
-          <LoyaltyProgramSection />
-        </motion.div>
+        <HowItWorksSection />
       </Suspense>
 
       <Suspense fallback={<ComponentLoadingFallback className="py-24" />}>
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.8, delay: 0.5 }}
-        >
-          <PartnersSection />
-        </motion.div>
+        <PartnersSection />
       </Suspense>
 
       <Suspense fallback={<ComponentLoadingFallback className="py-24" />}>
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-        >
-          <ReviewsSection />
-        </motion.div>
-      </Suspense>
-
-      <Suspense fallback={<ComponentLoadingFallback className="py-24" />}>
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.8, delay: 0.7 }}
-        >
-          <AppDownloadSection />
-        </motion.div>
+        <AppDownloadSection />
       </Suspense>
     </div>
   );

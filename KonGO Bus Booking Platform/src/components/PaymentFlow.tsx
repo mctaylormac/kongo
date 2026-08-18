@@ -49,6 +49,7 @@ import { AgeCategory } from "./app/AppConstants";
 interface PaymentFlowProps {
   trip: any;
   seats: any[];
+  baggageData?: any;
   searchParams: any;
   onPaymentComplete: (paymentData: any) => void;
   onBack: () => void;
@@ -72,6 +73,7 @@ interface PaymentMethod {
 export function PaymentFlow({
   trip,
   seats,
+  baggageData,
   searchParams,
   onPaymentComplete,
   onBack,
@@ -114,7 +116,6 @@ export function PaymentFlow({
           }
         }
       } catch (error) {
-        console.error('Error fetching profile in PaymentFlow:', error);
       }
     };
     fetchProfile();
@@ -148,15 +149,66 @@ export function PaymentFlow({
     fetchAgeCategories();
   }, [seats, trip?.id]);
 
-  const paymentMethods: PaymentMethod[] = [
+  const [dbPaymentMethods, setDbPaymentMethods] = useState<PaymentMethod[]>([]);
+
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("payment_methods")
+          .select("*")
+          .eq("is_active", true)
+          .order("name", { ascending: true });
+
+        if (error || !data || data.length === 0) return;
+
+        const mapped: PaymentMethod[] = data.map((pm: any) => {
+          const code = (pm.code || "").toLowerCase();
+          let logoType: any = "orange_money";
+          if (code.includes("airtel")) logoType = "airtel_money";
+          else if (code.includes("mpesa")) logoType = "mpesa";
+          else if (code.includes("visa")) logoType = "visa";
+          else if (code.includes("mastercard")) logoType = "mastercard";
+          else if (code.includes("equity")) logoType = "equity_bank";
+          else if (code.includes("rawbank")) logoType = "rawbank";
+          else if (code.includes("tmb")) logoType = "tmb";
+
+          let type: any = "mobile_money";
+          if (code.includes("card") || code.includes("visa") || code.includes("mastercard")) type = "card";
+          else if (code.includes("bank") || code.includes("equity") || code.includes("rawbank") || code.includes("tmb")) type = "bank_transfer";
+
+          return {
+            id: pm.code || pm.id,
+            name: pm.name,
+            type,
+            logoType,
+            description: pm.instructions || `Payez via ${pm.name}`,
+            fees: (pm.fees_percentage || 0) / 100,
+            processingTime: pm.processing_time || "Instantane",
+            supported: true
+          };
+        });
+
+        if (mapped.length > 0) {
+          setDbPaymentMethods(mapped);
+        }
+      } catch (err) {
+        console.error("Error fetching db payment methods:", err);
+      }
+    };
+
+    fetchPaymentMethods();
+  }, []);
+
+  const defaultPaymentMethods: PaymentMethod[] = [
     {
       id: "orange_money",
       name: "Orange Money",
       type: "mobile_money",
       logoType: "orange_money",
-      description: "Paiement rapide et sécurisé avec Orange Money",
+      description: "Paiement rapide et securise avec Orange Money",
       fees: 0.015, // 1.5%
-      processingTime: "Instantané",
+      processingTime: "Instantane",
       supported: true,
       popular: true,
       bonus: "0% de frais pour les nouveaux utilisateurs"
@@ -168,10 +220,10 @@ export function PaymentFlow({
       logoType: "airtel_money",
       description: "Payez facilement avec votre compte Airtel Money",
       fees: 0.015, // 1.5%
-      processingTime: "Instantané",
+      processingTime: "Instantane",
       supported: true,
       popular: true,
-      bonus: "Cashback 1% sur votre première ràƒÂ©servation"
+      bonus: "Cashback 1% sur votre premiere reservation"
     },
     {
       id: "mpesa",
@@ -180,16 +232,16 @@ export function PaymentFlow({
       logoType: "mpesa",
       description: "Service mobile money de Vodacom Congo",
       fees: 0.02, // 2%
-      processingTime: "Instantané",
+      processingTime: "Instantane",
       supported: true,
-      bonus: "Points de fidélité doublàƒÂ©s"
+      bonus: "Points de fidelite doubles"
     },
     {
       id: "visa_card",
       name: "Carte Visa",
       type: "card",
       logoType: "visa",
-      description: "Cartes de cràƒÂ©dit/dàƒÂ©bit Visa acceptées partout",
+      description: "Cartes de credit/debit Visa acceptees partout",
       fees: 0.035, // 3.5%
       processingTime: "2-5 minutes",
       supported: isOnline
@@ -199,7 +251,7 @@ export function PaymentFlow({
       name: "Mastercard",
       type: "card",
       logoType: "mastercard",
-      description: "Cartes de cràƒÂ©dit/dàƒÂ©bit Mastercard",
+      description: "Cartes de credit/debit Mastercard",
       fees: 0.035, // 3.5%
       processingTime: "2-5 minutes",
       supported: isOnline
@@ -236,6 +288,8 @@ export function PaymentFlow({
     }
   ];
 
+  const paymentMethods: PaymentMethod[] = dbPaymentMethods.length ? dbPaymentMethods : defaultPaymentMethods;
+
   const getSubtotal = () => {
     return seats.reduce((sum, seat) => {
       const catId = seatPassengers[seat.id];
@@ -259,7 +313,8 @@ export function PaymentFlow({
   };
 
   const getTotal = () => {
-    return getSubtotal() + getSelectedMethodFees() - getPromoDiscount();
+    const baggageCost = baggageData?.totalCost || 0;
+    return getSubtotal() + getSelectedMethodFees() + baggageCost - getPromoDiscount();
   };
 
   const formatPrice = (price: number) => {
@@ -280,24 +335,24 @@ export function PaymentFlow({
   const applyPromoCode = () => {
     if (promoCode.toLowerCase() === "kongo10" || promoCode.toLowerCase() === "welcome") {
       setPromoApplied(true);
-      toast.success("à°Å¸Å½â€° Code promo appliqué !", {
-        description: "10% de réduction sur votre ràƒÂ©servation"
+      toast.success("Code promo applique !", {
+        description: "10% de reduction sur votre reservation"
       });
     } else {
       toast.error("Code promo invalide", {
-        description: "VàƒÂ©rifiez votre code et réessayez"
+        description: "Verifiez votre code et reessayez"
       });
     }
   };
 
   const handlePaymentSubmit = async () => {
     if (!selectedMethod) {
-      toast.error("Sélectionnez une màƒÂ©thode de paiement");
+      toast.error("Selectionnez une methode de paiement");
       return;
     }
 
     if (!agreedToTerms) {
-      toast.error("Veuillez accepter les conditions générales");
+      toast.error("Veuillez accepter les conditions generales");
       return;
     }
 
@@ -340,89 +395,106 @@ export function PaymentFlow({
         toast.loading("Envoi de la demande de paiement...", { id: 'payment' });
         await new Promise(resolve => setTimeout(resolve, 1500));
 
-        toast.loading("En attente de votre confirmation sur votre téléphone", { id: 'payment' });
+        toast.loading("En attente de votre confirmation sur votre telephone", { id: 'payment' });
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } else if (method.type === "card") {
         await new Promise(resolve => setTimeout(resolve, 2000));
       } else {
         toast.loading("Traitement du paiement...", { id: 'payment' });
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
 
-      // [Agent Dev] Guard: trip_id is NOT NULL in DB â€” block payment if missing
+      // Guard: trip_id is required before finalizing a booking.
       if (!trip?.id) {
-        toast.error("Impossible de finaliser la réservation", {
-          description: "Le voyage sélectionné est invalide. Veuillez revenir à la recherche et sélectionner un trajet."
+        toast.error("Impossible de finaliser la reservation", {
+          description: "Le voyage selectionne est invalide. Veuillez revenir a la recherche et selectionner un trajet."
         });
         setIsProcessing(false);
         return;
       }
 
-      // Enregistrer la réservation dans Supabase pour le backoffice
-      let bookingCode = `KGO${Date.now().toString().slice(-6)}`;
+      // Calculate final pricing and code ONCE to guarantee consistency
+      // between the database and the client-side confirmation UI.
+      const bookingCode = `KGO${Date.now().toString().slice(-6)}`;
+      const finalTotalPrice = getTotal();
+      const finalMethodFees = getSelectedMethodFees();
+      const finalDiscount = getPromoDiscount();
+
+      // Enregistrer la reservation dans Supabase pour le backoffice
       try {
         const { data: { user } } = await supabase.auth.getUser();
 
-        // [Agent Dev] Fix: payment_status CHECK constraint only allows: 'pending','paid','failed','refunded'
-        // 'completed' was causing a 400 violation â€” use 'paid' for successful payments
+        // payment_status allows 'pending','paid','failed','refunded'.
+        // Keep 'paid' for successful payments.
         const bookingPayload: any = {
           booking_code: bookingCode,
-          trip_id: trip.id,              // Required NOT NULL â€” guaranteed by guard above
-          total_price: getTotal(),
-          payment_status: 'paid',        // FIX: was 'completed' â†’ violates CHECK constraint
+          trip_id: trip.id,
+          total_price: finalTotalPrice,
+          payment_status: 'paid',
           status: 'confirmed',
           currency,
           passenger_count: seats.length,
           seats: seats,
-          contact_email: paymentData.email || '',
-          contact_phone: paymentData.phone || '',
+          contact_email: autoFilledData.email || '',
+          contact_phone: autoFilledData.phone || '',
+          baggage_fee: baggageData?.totalCost || 0,
+          baggage_info: baggageData ? JSON.stringify(baggageData) : null,
+          payment_method: selectedMethod,
         };
 
-        // Lier à l'utilisateur courant si disponible
+        // Lier a l'utilisateur courant si disponible
         if (user) {
           bookingPayload.user_id = user.id;
         }
 
-        const { error: bookingError } = await supabase
+        const { data: newBooking, error: bookingError } = await supabase
           .from('bookings')
-          .insert(bookingPayload);
+          .insert(bookingPayload)
+          .select()
+          .single();
 
         if (bookingError) {
-          console.error('Erreur lors de la cràƒÂ©ation de la ràƒÂ©servation:', bookingError);
-          console.error('Détails:', JSON.stringify(bookingError, null, 2));
-          toast.error("La ràƒÂ©servation n'a pas pu àƒÂªtre enregistràƒÂ©e dans l'admin", {
+          toast.error("La reservation n'a pas pu etre enregistree dans l'admin", {
             description: bookingError.message
           });
-        } else {
-          console.log('[KonGO] RàƒÂ©servation cràƒÂ©àƒÂ©e avec succàƒÂ¨s:', bookingCode);
+        }
+
+        // [Agent Dev Web] - Action: Synchronisation de la table booking_seats pour compatibilitÃ© Borne/Backoffice
+        if (newBooking && seats.length > 0) {
+          const seatRecords = seats.map((s: any) => ({
+            booking_id: newBooking.id,
+            seat_number: typeof s === 'string' ? s : (s.id || s.seatNumber),
+            price: s.price || (finalTotalPrice / seats.length),
+            seat_type: s.type || 'standard'
+          }));
+          
+          await supabase.from('booking_seats').insert(seatRecords);
         }
       } catch (bookingException: any) {
-        console.error('Exception lors de la cràƒÂ©ation de la ràƒÂ©servation:', bookingException);
+        console.error("Booking recording error:", bookingException);
       }
 
-      const bookingData = {
-        method: selectedMethod,
-        amount: getTotal(),
+      const bookingData: any = {
+        id: `BK${Date.now()}`,
+        trip: trip,
+        seats: seats,
+        baggage: baggageData || undefined,
+        totalPrice: finalTotalPrice,
         currency: currency,
-        fees: getSelectedMethodFees(),
-        discount: getPromoDiscount(),
-        transactionId: `KGO${Date.now()}`,
-        status: "completed",
-        processedAt: new Date().toISOString(),
-        promoCode: promoApplied ? promoCode : null,
+        paymentMethod: selectedMethod,
+        paymentStatus: 'completed',
+        bookingDate: new Date().toISOString(),
+        confirmationCode: bookingCode,
         booking_code: bookingCode,
-        ...safePaymentData,
-        trip: trip || {
-          from: searchParams?.from || "Kinshasa",
-          to: searchParams?.to || "Lubumbashi",
-          departure: "08:00",
-          duration: "16h",
-          date: searchParams?.date || new Date().toISOString().split('T')[0]
-        },
-        seats: seats || [{ row: "12", column: "A", type: "standard", price: getTotal() }]
+        transactionId: bookingCode,
+        fees: finalMethodFees,
+        discount: finalDiscount,
+        ...safePaymentData
       };
 
-      toast.success("à°Å¸Å½â€° Paiement réussi !", {
+      toast.success("Paiement reussi !", {
         id: 'payment',
-        description: "Votre ràƒÂ©servation a àƒÂ©tàƒÂ© confirmàƒÂ©e. Billet envoyàƒÂ© par email.",
+        description: "Votre reservation a ete confirmee. Billet envoye par email.",
         action: {
           label: "Voir le billet",
           onClick: () => { }
@@ -431,7 +503,7 @@ export function PaymentFlow({
 
       // Add bonus animation for successful payment
       const celebrationEvent = new CustomEvent('payment-success', {
-        detail: { method: method.name, amount: formatPrice(convertCurrency(getTotal())) }
+        detail: { method: method.name, amount: formatPrice(convertCurrency(finalTotalPrice)) }
       });
       window.dispatchEvent(celebrationEvent);
 
@@ -439,7 +511,7 @@ export function PaymentFlow({
     } catch (error) {
       toast.error("Erreur de paiement", {
         id: 'payment',
-        description: "Veuillez ràƒÂ©essayer ou changer de màƒÂ©thode"
+        description: "Veuillez reessayer ou changer de methode"
       });
     } finally {
       setIsProcessing(false);
@@ -476,7 +548,7 @@ export function PaymentFlow({
             <div className="space-y-4">
               <div>
                 <Label htmlFor="phoneNumber" className="text-label text-primary font-semibold mb-2 block">
-                  Numéro de téléphone *
+                  Numero de telephone *
                 </Label>
                 <div className="relative">
                   <Smartphone className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-tertiary" />
@@ -491,7 +563,7 @@ export function PaymentFlow({
                 </div>
                 <div className="text-body-xs text-tertiary mt-2 flex items-center space-x-2">
                   <CheckCircle2 className="w-4 h-4 text-success" />
-                  <span>Code de confirmation envoyàƒÂ© automatiquement</span>
+                  <span>Code de confirmation envoye automatiquement</span>
                 </div>
               </div>
 
@@ -509,8 +581,8 @@ export function PaymentFlow({
                     <div className="text-body font-semibold text-kongo-black mb-3">Instructions de paiement :</div>
                     <ol className="space-y-3">
                       {[
-                        { step: 1, text: `Composez *144# sur votre téléphone ${method.name}` },
-                        { step: 2, text: 'Sélectionnez "Payer marchand"' },
+                        { step: 1, text: `Composez *144# sur votre telephone ${method.name}` },
+                        { step: 2, text: 'Selectionnez "Payer marchand"' },
                         { step: 3, text: 'Entrez le code marchand KonGO: 567890' },
                         { step: 4, text: `Confirmez le montant : ${formatPrice(convertCurrency(getTotal()))}` }
                       ].map((instruction) => (
@@ -558,7 +630,7 @@ export function PaymentFlow({
               <div className="space-y-6">
                 <div>
                   <Label htmlFor="cardNumber" className="text-label text-white font-semibold mb-2 block">
-                    Numéro de carte *
+                    Numero de carte *
                   </Label>
                   <Input
                     id="cardNumber"
@@ -681,7 +753,7 @@ export function PaymentFlow({
                         <span className="text-kongo-black font-semibold">KonGO SARL</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-secondary font-medium">RàƒÂ©fàƒÂ©rence :</span>
+                        <span className="text-secondary font-medium">Reference :</span>
                         <span className="text-kongo-lime-dark font-bold font-mono bg-kongo-lime/20 px-2 py-1 rounded">
                           {`KGO${Date.now().toString().slice(-6)}`}
                         </span>
@@ -698,8 +770,8 @@ export function PaymentFlow({
                 <div className="text-body-small text-orange-800">
                   <div className="font-semibold text-orange-900 mb-2">Temps de traitement :</div>
                   <div className="leading-relaxed">
-                    Votre ràƒÂ©servation sera confirmàƒÂ©e apràƒÂ¨s validation du virement ({method.processingTime}).
-                    Vous recevrez un email de confirmation une fois le paiement traitàƒÂ©.
+                    Votre reservation sera confirmee apres validation du virement ({method.processingTime}).
+                    Vous recevrez un email de confirmation une fois le paiement traite.
                   </div>
                 </div>
               </div>
@@ -733,12 +805,12 @@ export function PaymentFlow({
                     <div>
                       <h1 className="text-h2 font-bold text-white mb-2">Finaliser votre paiement</h1>
                       <p className="text-body-large text-white/90 mb-2">
-                        {trip?.from} ââ€ â€™ {trip?.to} ââ‚¬Â¢ {seats.length} siàƒÂ¨ge{seats.length > 1 ? 's' : ''} ââ‚¬Â¢ {trip?.date}
+                        {trip?.from} - {trip?.to} | {seats.length} siege{seats.length > 1 ? 's' : ''} | {trip?.date}
                       </p>
                       <div className="flex items-center space-x-6 text-body-small text-white/75">
                         <div className="flex items-center space-x-2">
                           <Shield className="w-4 h-4" />
-                          <span>Paiement 100% sécurisé</span>
+                          <span>Paiement 100% securise</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           {isOnline ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
@@ -790,7 +862,7 @@ export function PaymentFlow({
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-h4 text-kongo-black flex items-center space-x-3">
                         <Sparkles className="w-6 h-6 text-kongo-lime" />
-                        <span>MàƒÂ©thodes de paiement</span>
+                        <span>Methodes de paiement</span>
                       </CardTitle>
                       <div className="bg-kongo-lime/15 text-kongo-black border border-kongo-lime/30 px-3 py-1 rounded-full text-sm font-semibold">
                         {paymentMethods.filter(m => m.supported).length} options
@@ -857,7 +929,7 @@ export function PaymentFlow({
                       <CardHeader>
                         <CardTitle className="text-h5 text-kongo-black flex items-center space-x-3">
                           <Lock className="w-5 h-5 text-success" />
-                          <span>Détails de paiement</span>
+                          <span>Details de paiement</span>
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
@@ -885,7 +957,7 @@ export function PaymentFlow({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <Label htmlFor="firstName" className="text-label text-primary font-semibold mb-2 block">
-                          Prénom *
+                          Prenom *
                         </Label>
                         <div className="relative">
                           <User className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-tertiary" />
@@ -932,13 +1004,13 @@ export function PaymentFlow({
                       </div>
                       <div className="text-body-xs text-tertiary mt-2 flex items-center space-x-2">
                         <CheckCircle2 className="w-4 h-4 text-success" />
-                        <span>Votre billet àƒÂ©lectronique sera envoyàƒÂ© àƒÂ  cette adresse</span>
+                        <span>Votre billet electronique sera envoye a cette adresse</span>
                       </div>
                     </div>
 
                     <div>
                       <Label htmlFor="phone" className="text-label text-primary font-semibold mb-2 block">
-                        TàƒÂ©làƒÂ©phone *
+                        Telephone *
                       </Label>
                       <div className="relative">
                         <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-tertiary" />
@@ -969,17 +1041,17 @@ export function PaymentFlow({
                 <CardHeader>
                   <CardTitle className="text-h5 text-kongo-black flex items-center space-x-3">
                     <TrendingUp className="w-5 h-5 text-kongo-lime" />
-                    <span>Résumé du voyage</span>
+                    <span>Resume du voyage</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex items-center space-x-4 p-4 bg-surface-secondary border border-border-secondary rounded-lg">
                     <div className="w-12 h-12 bg-kongo-lime rounded-xl flex items-center justify-center">
-                      <span className="text-kongo-black font-bold text-lg">à°Å¸Å¡Å’</span>
+                      <span className="text-kongo-black font-bold text-lg">K</span>
                     </div>
                     <div className="flex-1">
-                      <div className="text-body font-semibold text-kongo-black">{trip?.from} ââ€ â€™ {trip?.to}</div>
-                      <div className="text-body-small text-secondary">{trip?.date} ââ‚¬Â¢ {trip?.time}</div>
+                      <div className="text-body font-semibold text-kongo-black">{trip?.from} - {trip?.to}</div>
+                      <div className="text-body-small text-secondary">{trip?.date} | {trip?.time}</div>
                       <div className="text-body-small text-tertiary">{trip?.company}</div>
                     </div>
                   </div>
@@ -993,7 +1065,7 @@ export function PaymentFlow({
                         {seats.map((seat) => (
                           <div key={seat.id} className="flex flex-col space-y-2 p-3 bg-white border border-border-secondary rounded-xl">
                             <div className="flex justify-between items-center">
-                              <span className="text-body-small font-bold">Siège {seat.number}</span>
+                              <span className="text-body-small font-bold">Siege {seat.number}</span>
                               <span className="text-body-xs font-medium text-tertiary">
                                 {formatPrice(convertCurrency(Number(seat.price || trip.price || 0)))}
                               </span>
@@ -1003,7 +1075,7 @@ export function PaymentFlow({
                               onValueChange={(val: string) => setSeatPassengers(prev => ({ ...prev, [seat.id]: val }))}
                             >
                               <SelectTrigger className="h-10 border border-border-secondary rounded-lg text-xs bg-white">
-                                <SelectValue placeholder="Catégorie d'âge" />
+                                <SelectValue placeholder="Categorie d'age" />
                               </SelectTrigger>
                               <SelectContent position="popper" className="z-[9999] min-w-[150px]">
                                 {ageCategories.map((cat) => (
@@ -1021,7 +1093,7 @@ export function PaymentFlow({
                     <Separator />
 
                     <div className="flex justify-between items-center">
-                      <span className="text-body-small text-secondary">Total Sièges ({seats.length})</span>
+                      <span className="text-body-small text-secondary">Total Sieges ({seats.length})</span>
                       <span className="text-body font-semibold text-kongo-black">
                         {seats.map(s => s.number).join(', ')}
                       </span>
@@ -1042,7 +1114,7 @@ export function PaymentFlow({
                     )}
                     {promoApplied && (
                       <div className="flex justify-between items-center text-success">
-                        <span className="text-body-small font-medium">Réduction (KONGO10)</span>
+                        <span className="text-body-small font-medium">Reduction (KONGO10)</span>
                         <span className="text-body font-semibold">
                           -{formatPrice(convertCurrency(getPromoDiscount()))}
                         </span>
@@ -1090,8 +1162,8 @@ export function PaymentFlow({
                     <div className="flex items-center space-x-3 p-4 bg-success/10 border border-success/30 rounded-lg">
                       <CheckCircle2 className="w-5 h-5 text-success" />
                       <div className="flex-1">
-                        <div className="text-body-small font-semibold text-success">Code appliqué avec succàƒÂ¨s</div>
-                        <div className="text-body-xs text-success/80">{promoCode} - 10% de ràƒÂ©duction</div>
+                        <div className="text-body-small font-semibold text-success">Code applique avec succes</div>
+                        <div className="text-body-xs text-success/80">{promoCode} - 10% de reduction</div>
                       </div>
                     </div>
                   )}
@@ -1111,11 +1183,11 @@ export function PaymentFlow({
                     <label htmlFor="terms" className="text-body-small text-secondary leading-relaxed cursor-pointer">
                       J'accepte les{" "}
                       <span className="text-kongo-black font-semibold underline cursor-pointer hover:text-kongo-lime">
-                        conditions gàƒÂ©nàƒÂ©rales
+                        conditions generales
                       </span>
                       {" "}et la{" "}
                       <span className="text-kongo-black font-semibold underline cursor-pointer hover:text-kongo-lime">
-                        politique de confidentialitàƒÂ©
+                        politique de confidentialite
                       </span>
                       {" "}de KonGO
                     </label>
@@ -1152,4 +1224,5 @@ export function PaymentFlow({
     </div>
   );
 }
+
 

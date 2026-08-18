@@ -1,10 +1,10 @@
 
-  import { defineConfig } from 'vite';
-  import react from '@vitejs/plugin-react-swc';
-  import path from 'path';
+import { defineConfig, splitVendorChunkPlugin } from 'vite';
+import react from '@vitejs/plugin-react-swc';
+import path from 'path';
 
-  export default defineConfig({
-    plugins: [react()],
+export default defineConfig({
+  plugins: [react(), splitVendorChunkPlugin()],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
@@ -52,12 +52,33 @@
         '@': path.resolve(__dirname, './src'),
       },
     },
-    build: {
+  build: {
       target: 'esnext',
       outDir: 'build',
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (id.includes('jspdf')) return 'jspdf';
+            if (id.includes('html2canvas')) return 'html2canvas';
+            if (id.includes('@supabase')) return 'supabase';
+            if (id.includes('motion') || id.includes('framer-motion')) return 'motion';
+            if (id.includes('recharts')) return 'charts';
+            if (id.includes('@radix-ui')) return 'radix';
+            if (id.includes('lucide-react')) return 'icons';
+            if (id.includes('react-hook-form') || id.includes('input-otp') || id.includes('react-day-picker')) return 'forms';
+            return 'vendor';
+          },
+        },
+      },
     },
     server: {
       port: 3000,
       open: true,
+    },
+    test: {
+      environment: 'jsdom',
+      setupFiles: './src/test/setup.ts',
+      globals: true,
     },
   });

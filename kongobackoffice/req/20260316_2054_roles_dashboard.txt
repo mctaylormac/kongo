@@ -1,0 +1,22 @@
+LOG SESSION - 2026-03-16 20:54
+==============================
+
+REQUÊTE UTILISATEUR :
+"je viens de me connecter avec les 3 comptes je te rappelle ce que je t'ai demandé
+
+le superuser ne gere que les agences
+les agences gerent leurs bus, les voyages, les chauffeurs et leurs affectations a des bus
+mais biensur qu'il peut voir la situation globale, le nombre d'agence et quand on clique sur le nombre voir le nombre de bus par agence, nombre de voyage...
+
+les chauffeurs ne scannent que le ticket pour valider un passager ou pas et avec une historique de scan
+utilise l'agent supabase pour mettre a jour la bdd
+
+une derniere chose lorsqu'un client connecté, reserve un ticket que l'admin puisse voir ca"
+
+AGENTS ACTIVÉS :
+- Agent Brainstorming
+- Agent Dev Web (React)
+- Agent Supabase (Data)
+
+STATUS : EN COURS...
+==============================

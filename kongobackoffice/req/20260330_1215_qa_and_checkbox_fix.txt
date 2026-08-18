@@ -1,0 +1,23 @@
+# 📜 [Agent Archiviste] - Log de Session 2026-03-30_1215
+
+## 🎯 Demande Utilisateur
+1. Vérification du design de la page de recherche via l'Agent QA.
+2. Renforcement de la visibilité des bordures des cases à cocher (filtres).
+
+## 🛠️ Travail Effectué
+
+### Audit QA (Agent QA)
+- L'agent a confirmé que le design des cartes de résultats suit maintenant rigoureusement la grille multi-colonnes demandée (Itinéraire | Alerte | Prix).
+- Le badge vert "ACTIF" et l'encart d'alerte prix sont validés.
+- La ligne de temps (Timeline) est centrée et horizontale.
+
+### Correction Visuelle (Checkboxes)
+- **Filtres de Recherche :** Épaississement des bordures des checkboxes dans la barre latérale de `SearchResults.tsx` (`border-2 border-gray-400`).
+- **Formulaires Admin :** Application de la même règle de visibilité renforcée dans `AdminForms.tsx` pour une cohérence totale de l'interface.
+
+## 📂 Fichiers Modifiés
+- `src/components/SearchResults.tsx`
+- `src/components/admin/AdminForms.tsx`
+
+## ✅ Statut
+Toutes les modifications demandées sont en ligne et validées. L'interface est passée du "désordre" à une structure Premium 12-colonnes avec des contrôles (checkboxes) nettement plus lisibles.

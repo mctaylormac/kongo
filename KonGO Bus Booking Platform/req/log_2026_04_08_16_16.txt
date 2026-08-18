@@ -1,0 +1,16 @@
+============= LOG SESSION =============
+Date: 2026-04-08T16:15:00+01:00
+
+Demande utilisateur:
+"les agences de la page agence doit provenir de la bdd et non des données mockées"
+
+Travail accompli:
+- [Agent Dev Web] Modification de `AgencyDirectory.tsx` pour ne plus utiliser les données statiques du mock.
+- [Agent Supabase] Les relations `trips` et `buses` sont désormais tirées en dynamique via la DB sur supabase. L'affichage s'adapte aux quantités effectives sans dépendances à DEFAULT_AGENCY_VALUES qui figeait les reviewCount ou totalTrips des agences.
+- La structure de l'objet a été mise à plat pour assurer que null/undefined sont traités.
+
+Fichiers Modifiés:
+- c:\web\meji\kongo\KonGO Bus Booking Platform\src\components\AgencyDirectory.tsx
+- c:\web\meji\kongo\kongobackoffice\src\components\AgencyDirectory.tsx (si applicable / mis à jour pour cohérence)
+
+=========================================

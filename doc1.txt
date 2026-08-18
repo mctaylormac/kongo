@@ -1,0 +1,95 @@
+2. Guide des Assets Graphiques & Captures d'Écran (Normes 2026)
+Pour éviter les rejets automatiques des stores, générer et structurer les images exactement selon les tailles suivantes.
+
+🍏 Apple App Store
+Apple applique une politique stricte de mise à l'échelle. La règle d'or en 2026 est de fournir les captures au format maximal (6.9" et 13"), l'App Store se chargeant de les adapter proprement pour les écrans inférieurs.
+
+Format requis : PNG (sRGB) ou JPEG. Attention : Transparence (canal alpha) strictement interdite (risque de rejet immédiat).
+
+Nombre : Minimum 1, maximum 10 par catégorie d'appareil.
+
+Tailles des captures d'écran :
+
+iPhone 6.9" (Génération iPhone 16/17 Pro Max - Taille principale obligatoire) : 1320 x 2868 px (Portrait)
+
+iPhone 6.7" (Modèles Plus - Fallback) : 1290 x 2796 px (Portrait)
+
+iPad Pro 13" (M4/M5 - Obligatoire si l'app supporte l'iPad) : 2064 x 2752 px (Portrait)
+
+Icône de l'application : 1024 x 1024 px (gérée automatiquement via l'asset d'Expo si bien configurée).
+
+⚠️ Règle critique : La barre de statut sur les captures d'écran doit être "propre" (pas de batterie faible, pas de logo d'opérateur mobile réel, heure fictive).
+
+🤖 Google Play Store
+Le Play Store exige des visuels marketing spécifiques en plus des captures d'écran de l'interface.
+
+Format requis : PNG ou JPEG (24 bits sans alpha pour les graphiques, 32 bits avec alpha pour l'icône). Max 8 Mo par image.
+
+Nombre : Minimum 2, maximum 8 captures par type d'appareil.
+
+Tailles requises :
+
+Icône de l'application (Store) : 512 x 512 px (PNG 32-bit avec transparence, max 1024 Ko).
+
+Graphique de présentation (Feature Graphic) : 1024 x 500 px (JPEG ou PNG sans alpha). Élément indispensable pour la mise en avant.
+
+Captures Écran Téléphone : Résolution minimale de 320 px et maximale de 3840 px. Le ratio d'aspect ne doit pas dépasser 2:1 (ex: 1080 x 1920 px ou 1440 x 2560 px sont parfaits).
+
+Captures Écran Tablettes (Grande taille) : Minimum 4 captures distinctes au format 16:9 (Paysage) ou 9:16 (Portrait), taille comprise entre 1080 px et 7680 px.
+
+3. Plan d'Exécution pour l'IA (Playbook EAS)
+L'IA peut exécuter ou guider le développeur à travers les commandes suivantes via le CLI d'Expo Application Services (EAS).
+
+Étape 1 : Initialisation et Authentification
+Bash
+# Installation globale du CLI EAS si non présent
+npm install --global eas-cli
+
+# Connexion au compte Expo
+eas login
+Étape 2 : Configuration du fichier eas.json
+Vérifier ou générer un profil de production optimisé pour les stores :
+
+JSON
+{
+  "cli": {
+    "version": ">= 5.0.0"
+  },
+  "build": {
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "simulator": false
+      }
+    }
+  }
+}
+Étape 3 : Lancement des Builds de Production
+Lancer les compilations natives directement sur les serveurs d'Expo (évite d'avoir besoin d'un Mac ou d'Android Studio en local) :
+
+Bash
+# Compiler pour les deux plateformes en simultané
+eas build --platform all --profile production
+Étape 4 : Soumission vers les Stores (EAS Submit)
+Pour Apple iOS :
+La soumission via le CLI fonctionne dès la première tentative si le compte développeur Apple est configuré.
+
+Bash
+eas submit --platform ios
+Pour Google Android (⚠️ Alerte Piège Majeur) :
+L'API de Google Play interdit l'envoi automatisé d'une application qui n'a jamais été créée manuellement.
+
+L'IA/Le développeur doit récupérer le fichier .aab généré par eas build.
+
+Aller sur la console Google Play, créer l'application, remplir la fiche de lister et téléverser manuellement le premier build sur un canal (interne, alpha ou production).
+
+Une fois cette première action effectuée, les soumissions futures pourront se faire en ligne de commande :
+
+Bash
+eas submit --platform android
+
+### 💡 Conseils pour optimiser le travail de votre IA Antigravity :
+Une fois ce fichier enregistré sous le nom `DEPLOYMENT_GUIDE.md`, vous n'aurez plus qu'à dire à Antigravity : 
+*"Lis le fichier `DEPLOYMENT_GUIDE.md` à la racine, vérifie mes f

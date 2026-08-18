@@ -1,0 +1,19 @@
+============= LOG SESSION =============
+Date: 2026-04-09T19:50:00+01:00
+
+Demande utilisateur:
+"/meta-on" puis "dans ce dossier borneweb fait correspondre les sieges en fonction de sieges enregistrés si c'est 60 je veux voir 60 places, 45 egalement"
+
+Travail accompli:
+- [Agent Archiviste] Initialisation de la session et activation de la flotte LOKI.
+- [Meta-Agent] Audit technique effectué : React/Vite/Supabase/Tailwind.
+- [Meta-Agent] Analyse du contexte précédent : Fin de la migration vers des données dynamiques pour le répertoire des agences.
+- [Agent Supabase] Correction de la requête Supabase dans `App.tsx` : Suppression du join `buses(capacity)` qui causait une erreur 400 (Bad Request).
+- [Agent Dev Web] Correction de `KioskFlow.tsx` pour utiliser `trip.total_seats` au lieu du join manquant. La capacité dynamique est maintenant fonctionnelle via les données natives de la table `trips`.
+
+Fichiers Modifiés:
+- c:\web\meji\kongo\borneweb\src\App.tsx
+- c:\web\meji\kongo\borneweb\src\components\KioskFlow.tsx
+- c:\web\meji\kongo\KonGO Bus Booking Platform\req\log_2026_04_09_19_50.txt
+
+=========================================

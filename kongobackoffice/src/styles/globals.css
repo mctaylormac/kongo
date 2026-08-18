@@ -1,0 +1,787 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  
+  /* KonGO Original Brand Colors */
+  --kongo-black: #101820; /* Deep black - Primary brand color */
+  --kongo-black-hover: #1a2530;
+  --kongo-black-light: #2a3441;
+  --kongo-black-lighter: #3a4451;
+  --kongo-black-dark: #0a0f15;
+  
+  --kongo-lime: #bfeb30; /* Bright lime */
+  --kongo-lime-hover: #a8d125;
+  --kongo-lime-light: #d4f054;
+  --kongo-lime-lighter: #e8f578;
+  --kongo-lime-dark: #7a9c18; /* Darker for better visibility */
+  --kongo-lime-darker: #5d7812; /* Much darker for text on light backgrounds */
+  
+  /* Professional Neutral Scale (derived from kongo-black) */
+  --gray-50: #f8f9fa;
+  --gray-100: #f1f3f4;
+  --gray-200: #e8eaed;
+  --gray-300: #dadce0;
+  --gray-400: #9aa0a6;
+  --gray-500: #5f6368;
+  --gray-600: #3c4043;
+  --gray-700: #202124;
+  --gray-800: #171717;
+  --gray-900: var(--kongo-black);
+  --gray-950: #0a0a0a;
+  
+  /* Enhanced Text Colors for Professional Use with Original Brand */
+  --text-primary: var(--kongo-black);
+  --text-secondary: #202124; /* Darker for better contrast on light */
+  --text-tertiary: #3c4043;
+  --text-quaternary: #5f6368;
+  --text-disabled: #9aa0a6;
+  --text-inverse: #ffffff;
+  --text-on-black: #ffffff;
+  --text-on-lime: var(--kongo-black);
+  --text-on-lime-dark: #ffffff;
+  
+  /* Semantic Colors (complementing the brand palette) */
+  --color-success: #137333; /* Professional green */
+  --color-success-light: #e8f5e8;
+  --color-success-dark: #0d652d;
+  --color-warning: #ea8600; /* Professional orange */
+  --color-warning-light: #fef7e0;
+  --color-warning-dark: #b06000;
+  --color-error: #d93025; /* Professional red */
+  --color-error-light: #fce8e6;
+  --color-error-dark: #a50e0e;
+  --color-info: #1a73e8; /* Professional blue */
+  --color-info-light: #e8f0fe;
+  --color-info-dark: #1557b0;
+  
+  /* Professional Surface Colors */
+  --surface-primary: #ffffff;
+  --surface-secondary: var(--gray-50);
+  --surface-tertiary: var(--gray-100);
+  --surface-elevated: #ffffff;
+  --surface-hover: var(--gray-50);
+  --surface-active: var(--gray-100);
+  --surface-disabled: var(--gray-100);
+  --surface-overlay: rgba(16, 24, 32, 0.8);
+  
+  /* KonGO Brand Surfaces */
+  --surface-kongo-black: var(--kongo-black);
+  --surface-kongo-black-light: var(--kongo-black-light);
+  --surface-kongo-lime: var(--kongo-lime);
+  --surface-kongo-lime-light: rgba(191, 235, 48, 0.1);
+  --surface-kongo-lime-medium: rgba(191, 235, 48, 0.2);
+  
+  /* Border Colors */
+  --border-primary: var(--gray-200);
+  --border-secondary: var(--gray-300);
+  --border-strong: var(--gray-400);
+  --border-accent: var(--kongo-black);
+  --border-lime: var(--kongo-lime);
+  --border-success: var(--color-success);
+  --border-warning: var(--color-warning);
+  --border-error: var(--color-error);
+  
+  /* Shadow System */
+  --shadow-sm: 0 1px 2px 0 rgba(16, 24, 32, 0.05);
+  --shadow-base: 0 1px 3px 0 rgba(16, 24, 32, 0.1), 0 1px 2px -1px rgba(16, 24, 32, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(16, 24, 32, 0.1), 0 2px 4px -2px rgba(16, 24, 32, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(16, 24, 32, 0.1), 0 4px 6px -4px rgba(16, 24, 32, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(16, 24, 32, 0.1), 0 8px 10px -6px rgba(16, 24, 32, 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgba(16, 24, 32, 0.25);
+  
+  /* KonGO Brand Shadows */
+  --shadow-kongo-lime: 0 4px 14px 0 rgba(191, 235, 48, 0.39);
+  --shadow-kongo-black: 0 8px 25px -5px rgba(16, 24, 32, 0.3);
+  
+  /* Enhanced font weights for professional hierarchy */
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+  
+  /* Professional spacing scale */
+  --space-1: 0.25rem; /* 4px */
+  --space-2: 0.5rem;  /* 8px */
+  --space-3: 0.75rem; /* 12px */
+  --space-4: 1rem;    /* 16px */
+  --space-5: 1.25rem; /* 20px */
+  --space-6: 1.5rem;  /* 24px */
+  --space-8: 2rem;    /* 32px */
+  --space-10: 2.5rem; /* 40px */
+  --space-12: 3rem;   /* 48px */
+  --space-16: 4rem;   /* 64px */
+  --space-20: 5rem;   /* 80px */
+  --space-24: 6rem;   /* 96px */
+  
+  /* Radius system */
+  --radius-sm: 0.375rem;
+  --radius-base: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+  
+  /* Updated Shadcn variables for KonGO brand theme */
+  --background: var(--surface-primary);
+  --foreground: var(--text-primary);
+  --card: var(--surface-elevated);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-elevated);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--kongo-black);
+  --primary-foreground: var(--text-on-black);
+  --secondary: var(--kongo-lime);
+  --secondary-foreground: var(--text-on-lime);
+  --muted: var(--surface-tertiary);
+  --muted-foreground: var(--text-tertiary);
+  --accent: var(--kongo-lime);
+  --accent-foreground: var(--text-on-lime);
+  --destructive: var(--color-error);
+  --destructive-foreground: var(--text-inverse);
+  --border: var(--border-primary);
+  --input: var(--surface-primary);
+  --input-border: var(--border-secondary);
+  --ring: var(--kongo-lime);
+  --chart-1: var(--kongo-lime);
+  --chart-2: var(--kongo-black);
+  --chart-3: var(--color-info);
+  --chart-4: var(--color-success);
+  --chart-5: var(--color-warning);
+  --radius: var(--radius-base);
+}
+
+.dark {
+  --surface-primary: var(--kongo-black);
+  --surface-secondary: var(--kongo-black-light);
+  --surface-tertiary: var(--kongo-black-lighter);
+  --surface-elevated: var(--kongo-black-light);
+  --surface-hover: var(--kongo-black-light);
+  --surface-active: var(--kongo-black-lighter);
+  --surface-disabled: var(--kongo-black-light);
+  
+  --text-primary: #ffffff;
+  --text-secondary: #f1f3f4; /* Near white for dark mode visibility */
+  --text-tertiary: #dadce0;
+  --text-quaternary: #9aa0a6;
+  --text-disabled: #5f6368;
+  --text-inverse: var(--kongo-black);
+  
+  --border-primary: var(--kongo-black-lighter);
+  --border-secondary: var(--gray-600);
+  --border-strong: var(--gray-500);
+  
+  --background: var(--surface-primary);
+  --foreground: var(--text-primary);
+  --card: var(--surface-elevated);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-elevated);
+  --popover-foreground: var(--text-primary);
+  --secondary-foreground: var(--text-on-lime);
+  --muted: var(--surface-tertiary);
+  --muted-foreground: var(--text-tertiary);
+  --border: var(--border-primary);
+  --input: var(--surface-secondary);
+  --input-border: var(--border-secondary);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-border: var(--input-border);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  
+  /* KonGO Brand color utilities */
+  --color-kongo-black: var(--kongo-black);
+  --color-kongo-black-hover: var(--kongo-black-hover);
+  --color-kongo-black-light: var(--kongo-black-light);
+  --color-kongo-black-lighter: var(--kongo-black-lighter);
+  --color-kongo-black-dark: var(--kongo-black-dark);
+  --color-kongo-lime: var(--kongo-lime);
+  --color-kongo-lime-hover: var(--kongo-lime-hover);
+  --color-kongo-lime-light: var(--kongo-lime-light);
+  --color-kongo-lime-lighter: var(--kongo-lime-lighter);
+  --color-kongo-lime-dark: var(--kongo-lime-dark);
+  --color-kongo-lime-darker: var(--kongo-lime-darker);
+  
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-quaternary: var(--text-quaternary);
+  --color-text-disabled: var(--text-disabled);
+  --color-text-inverse: var(--text-inverse);
+  --color-text-on-black: var(--text-on-black);
+  --color-text-on-lime: var(--text-on-lime);
+  --color-text-on-lime-dark: var(--text-on-lime-dark);
+  
+  --color-surface-primary: var(--surface-primary);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-tertiary: var(--surface-tertiary);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+  --color-surface-disabled: var(--surface-disabled);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-kongo-black: var(--surface-kongo-black);
+  --color-surface-kongo-black-light: var(--surface-kongo-black-light);
+  --color-surface-kongo-lime: var(--surface-kongo-lime);
+  --color-surface-kongo-lime-light: var(--surface-kongo-lime-light);
+  --color-surface-kongo-lime-medium: var(--surface-kongo-lime-medium);
+  
+  --color-success: var(--color-success);
+  --color-success-light: var(--color-success-light);
+  --color-warning: var(--color-warning);
+  --color-warning-light: var(--color-warning-light);
+  --color-error: var(--color-error);
+  --color-error-light: var(--color-error-light);
+  --color-info: var(--color-info);
+  --color-info-light: var(--color-info-light);
+  
+  --color-border-primary: var(--border-primary);
+  --color-border-secondary: var(--border-secondary);
+  --color-border-strong: var(--border-strong);
+  --color-border-accent: var(--border-accent);
+  --color-border-lime: var(--border-lime);
+  --color-border-success: var(--border-success);
+  --color-border-warning: var(--border-warning);
+  --color-border-error: var(--border-error);
+  
+  --shadow-sm: var(--shadow-sm);
+  --shadow-base: var(--shadow-base);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+  --shadow-kongo-lime: var(--shadow-kongo-lime);
+  --shadow-kongo-black: var(--shadow-kongo-black);
+  
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-base);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --radius-full: var(--radius-full);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  
+  /* KonGO Professional focus states */
+  *:focus-visible {
+    outline: 2px solid var(--kongo-lime);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Screen reader only utility for accessibility */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
+/**
+ * Typography named utility classes (display, body, labels, etc.)
+ * NOTE: Headings (h1-h6), body text (p) and buttons are intentionally NOT
+ * overridden here so that Tailwind utility classes can have full control.
+ */
+@layer base {
+  .text-display-1 {
+    font-size: 3.5rem;
+    font-weight: var(--font-weight-extrabold);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+  }
+
+  .text-display-2 {
+    font-size: 3rem;
+    font-weight: var(--font-weight-bold);
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    color: var(--text-primary);
+  }
+
+  .text-body-large {
+    font-size: 1.125rem;
+    font-weight: var(--font-weight-normal);
+    line-height: 1.6;
+    color: var(--text-primary);
+  }
+
+  .text-body-small {
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-normal);
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+
+  .text-body-xs {
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-normal);
+    line-height: 1.4;
+    color: var(--text-tertiary);
+  }
+
+  .text-label {
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-medium);
+    line-height: 1.4;
+    color: var(--text-primary);
+  }
+
+  .text-label-small {
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-medium);
+    line-height: 1.4;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .text-meta {
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-normal);
+    line-height: 1.4;
+    color: var(--text-tertiary);
+  }
+
+  .text-caption {
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-medium);
+    line-height: 1.4;
+    color: var(--text-quaternary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .text-link {
+    color: var(--kongo-black);
+    text-decoration: none;
+    font-weight: var(--font-weight-medium);
+    transition: color 0.15s ease-in-out;
+  }
+
+  .text-link:hover {
+    color: var(--kongo-black-hover);
+    text-decoration: underline;
+  }
+
+  @media (max-width: 768px) {
+    .text-display-1 { font-size: 2.5rem; }
+    .text-display-2 { font-size: 2.25rem; }
+  }
+}
+
+/* KonGO Brand color utilities */
+.text-primary { color: var(--text-primary) !important; }
+.text-secondary { color: var(--text-secondary) !important; }
+.text-tertiary { color: var(--text-tertiary) !important; }
+.text-quaternary { color: var(--text-quaternary) !important; }
+.text-disabled { color: var(--text-disabled) !important; }
+.text-inverse { color: var(--text-inverse) !important; }
+.text-on-black { color: var(--text-on-black) !important; }
+.text-on-lime { color: var(--text-on-lime) !important; }
+.text-on-lime-dark { color: var(--text-on-lime-dark) !important; }
+
+.text-success { color: var(--color-success) !important; }
+.text-warning { color: var(--color-warning) !important; }
+.text-error { color: var(--color-error) !important; }
+.text-info { color: var(--color-info) !important; }
+
+/* KonGO Brand color utilities */
+.text-kongo-black { color: var(--kongo-black) !important; }
+.text-kongo-lime { color: var(--kongo-lime) !important; }
+.text-kongo-lime-dark { color: var(--kongo-lime-dark) !important; }
+
+.bg-kongo-black { background-color: var(--kongo-black); }
+.bg-kongo-black-hover { background-color: var(--kongo-black-hover); }
+.bg-kongo-black-light { background-color: var(--kongo-black-light); }
+.bg-kongo-black-lighter { background-color: var(--kongo-black-lighter); }
+.bg-kongo-lime { background-color: var(--kongo-lime); }
+.bg-kongo-lime-hover { background-color: var(--kongo-lime-hover); }
+.bg-kongo-lime-light { background-color: var(--kongo-lime-light); }
+.bg-kongo-lime-lighter { background-color: var(--kongo-lime-lighter); }
+
+.border-kongo-black { border-color: var(--kongo-black); }
+.border-kongo-lime { border-color: var(--kongo-lime); }
+
+/* Surface utilities */
+.bg-surface-primary { background-color: var(--surface-primary); }
+.bg-surface-secondary { background-color: var(--surface-secondary); }
+.bg-surface-tertiary { background-color: var(--surface-tertiary); }
+.bg-surface-elevated { background-color: var(--surface-elevated); }
+.bg-surface-kongo-lime-light { background-color: var(--surface-kongo-lime-light); }
+.bg-surface-kongo-lime-medium { background-color: var(--surface-kongo-lime-medium); }
+
+.hover\:bg-surface-hover:hover { background-color: var(--surface-hover); }
+.hover\:bg-surface-active:hover { background-color: var(--surface-active); }
+.hover\:bg-kongo-black-hover:hover { background-color: var(--kongo-black-hover); }
+.hover\:bg-kongo-lime-hover:hover { background-color: var(--kongo-lime-hover); }
+
+/* KonGO Professional button styles */
+.btn-primary {
+  background-color: var(--kongo-black);
+  color: var(--text-on-black);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-base);
+  border: 1px solid var(--kongo-black);
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.btn-primary:hover {
+  background-color: var(--kongo-black-hover);
+  border-color: var(--kongo-black-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-kongo-black);
+}
+
+.btn-secondary {
+  background-color: var(--kongo-lime);
+  color: var(--text-on-lime);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-base);
+  border: 1px solid var(--kongo-lime);
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.btn-secondary:hover {
+  background-color: var(--kongo-lime-hover);
+  border-color: var(--kongo-lime-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-kongo-lime);
+}
+
+.btn-accent {
+  background-color: var(--color-warning);
+  color: var(--text-inverse);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-base);
+  border: 1px solid var(--color-warning);
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.btn-accent:hover {
+  background-color: var(--color-warning-dark);
+  border-color: var(--color-warning-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-outline {
+  background-color: transparent;
+  color: var(--kongo-black);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-base);
+  border: 1px solid var(--kongo-black);
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.btn-outline:hover {
+  background-color: var(--kongo-black);
+  color: var(--text-on-black);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-outline-lime {
+  background-color: transparent;
+  color: var(--kongo-lime-dark);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-base);
+  border: 1px solid var(--kongo-lime);
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.btn-outline-lime:hover {
+  background-color: var(--kongo-lime);
+  color: var(--text-on-lime);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-kongo-lime);
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-base);
+  border: 1px solid transparent;
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.btn-ghost:hover {
+  background-color: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+/* Professional card styles with KonGO branding */
+.card-elevated {
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-base);
+  transition: all 0.15s ease-in-out;
+}
+
+.card-elevated:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.card-interactive {
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-base);
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+}
+
+.card-interactive:hover {
+  border-color: var(--kongo-lime);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.card-kongo {
+  background: linear-gradient(135deg, var(--kongo-black) 0%, var(--kongo-black-light) 100%);
+  color: var(--text-on-black);
+  border: 1px solid var(--kongo-black-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-kongo-black);
+  transition: all 0.15s ease-in-out;
+}
+
+.card-kongo:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xl);
+}
+
+/* Professional spacing utilities */
+.space-y-professional > * + * {
+  margin-top: var(--space-6);
+}
+
+.space-y-tight > * + * {
+  margin-top: var(--space-4);
+}
+
+.space-y-loose > * + * {
+  margin-top: var(--space-8);
+}
+
+/* Status indicators with KonGO branding */
+.status-success {
+  background-color: var(--color-success-light);
+  color: var(--color-success);
+  border: 1px solid var(--border-success);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-warning {
+  background-color: var(--color-warning-light);
+  color: var(--color-warning);
+  border: 1px solid var(--border-warning);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-error {
+  background-color: var(--color-error-light);
+  color: var(--color-error);
+  border: 1px solid var(--border-error);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-info {
+  background-color: var(--color-info-light);
+  color: var(--color-info);
+  border: 1px solid var(--color-info);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-kongo {
+  background-color: var(--surface-kongo-lime-light);
+  color: var(--kongo-lime-dark);
+  border: 1px solid var(--kongo-lime);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Professional layout utilities */
+.container-professional {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+@media (max-width: 768px) {
+  .container-professional {
+    padding: 0 var(--space-4);
+  }
+}
+
+/* KonGO Brand gradients */
+.gradient-kongo {
+  background: linear-gradient(135deg, var(--kongo-black) 0%, var(--kongo-black-light) 50%, var(--kongo-lime) 100%);
+}
+
+.gradient-kongo-reverse {
+  background: linear-gradient(135deg, var(--kongo-lime) 0%, var(--kongo-lime-light) 50%, var(--kongo-black) 100%);
+}
+
+.gradient-kongo-subtle {
+  background: linear-gradient(135deg, var(--surface-primary) 0%, var(--surface-kongo-lime-light) 50%, var(--surface-secondary) 100%);
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-contrast: high) {
+  :root {
+    --text-primary: #000000;
+    --text-secondary: #2c2c2c;
+    --border-primary: #000000;
+    --kongo-black: #000000;
+    --kongo-lime: #9bc120; /* Darker lime for better contrast */
+  }
+}
+
+/* Utility classes for components */
+.grid-cols-17 {
+  grid-template-columns: repeat(17, minmax(0, 1fr));
+}
+
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+/* Print optimizations */
+@media print {
+  * {
+    background: transparent !important;
+    color: black !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+  
+  a, a:visited {
+    text-decoration: underline;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}

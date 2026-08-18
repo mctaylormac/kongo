@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Bus, Map, Users, Loader2, RefreshCw, Ticket, BarChart3, Eye, LogOut, 
   Zap, TrendingUp, Shield, Plus, Pencil, Trash2, Building, Phone, X, 
-  UserX, Search, Check, UserCheck, ChevronRight, ClipboardList, MapPin as PinIcon
+  UserX, Search, Check, UserCheck, ChevronRight, ClipboardList, MapPin as PinIcon, Flag, AlertTriangle
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { 
@@ -15,10 +15,10 @@ import { Badge } from '../ui/badge';
 import { BookingDetailModal } from './BookingDetailModal';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
-import { AddBusForm, AddTripForm, AddDriverForm, AddStaffForm, AddStopForm, AddAgeCategoryForm, AddSiteForm } from './AdminForms';
+import { AddBusForm, AddTripForm, AddStaffForm, AddStopForm, AddAgeCategoryForm, AddSiteForm } from './AdminForms';
 import { Stop, AgeCategory } from '../app/AppConstants';
 
-type TabType = 'overview' | 'buses' | 'trips' | 'drivers' | 'staff' | 'sites' | 'bookings' | 'stops' | 'pricing';
+type TabType = 'overview' | 'buses' | 'trips' | 'personnel' | 'sites' | 'bookings' | 'stops' | 'pricing';
 
 interface Driver {
   id: string;
@@ -59,6 +59,11 @@ interface StaffMember {
   site_id: string | null;
   agency_sites?: { name: string }[] | null;
   created_at: string;
+  phone_number?: string | null;
+  license_number?: string | null;
+  assigned_bus_id?: string | null;
+  buses?: { name: string; plate_number: string } | null;
+  driver_id?: string | null;
 }
 
 interface AgencySite {
@@ -78,6 +83,32 @@ interface AgencyStats {
   revenue: number;
 }
 
+const DashboardSkeleton = () => (
+  <div className="p-8 space-y-8 animate-pulse max-w-7xl mx-auto">
+    <div className="flex justify-between items-center">
+      <div className="space-y-2">
+        <div className="h-4 w-20 bg-gray-200 rounded"></div>
+        <div className="h-10 w-64 bg-gray-200 rounded-xl"></div>
+      </div>
+      <div className="flex gap-2">
+        <div className="h-10 w-32 bg-gray-200 rounded-xl"></div>
+        <div className="h-10 w-10 bg-gray-200 rounded-xl"></div>
+      </div>
+    </div>
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      {[1, 2, 3, 4, 5].map(i => (
+        <div key={i} className="h-24 bg-gray-100 rounded-2xl"></div>
+      ))}
+    </div>
+    <div className="h-12 w-full bg-gray-100 rounded-xl"></div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {[1, 2, 3].map(i => (
+        <div key={i} className="h-64 bg-gray-50 rounded-3xl"></div>
+      ))}
+    </div>
+  </div>
+);
+
 export function AgencyDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [stats, setStats] = useState<AgencyStats>({ buses: 0, trips: 0, drivers: 0, bookings: 0, revenue: 0 });
@@ -93,7 +124,6 @@ export function AgencyDashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isBusFormOpen, setIsBusFormOpen] = useState(false);
   const [isTripFormOpen, setIsTripFormOpen] = useState(false);
-  const [isDriverFormOpen, setIsDriverFormOpen] = useState(false);
   const [isStaffFormOpen, setIsStaffFormOpen] = useState(false);
   const [isSiteFormOpen, setIsSiteFormOpen] = useState(false);
   const [isStopFormOpen, setIsStopFormOpen] = useState(false);
@@ -110,6 +140,9 @@ export function AgencyDashboard() {
   const [busSearchTerm, setBusSearchTerm] = useState('');
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [personnelFilter, setPersonnelFilter] = useState('all');
+  const [endTripModal, setEndTripModal] = useState<{ open: boolean; trip: Trip | null }>({ open: false, trip: null });
+  const [isEndingTrip, setIsEndingTrip] = useState(false);
 
   const fetchData = useCallback(async (refresh = false) => {
     if (refresh) setIsRefreshing(true);
@@ -144,7 +177,21 @@ export function AgencyDashboard() {
       setBuses(busRes.data || []);
       setTrips(tripRes.data || []);
       setDrivers(driverRes.data || []);
-      setStaffMembers(staffRes.data || []);
+      // Unified staff including drivers from the profiles table
+      const filteredStaff = (staffRes.data || []).map((s: any) => {
+          // If this staff member is a driver, link their profile to the specific driver data
+          const driverInfo = driverRes.data?.find((d: any) => d.user_id === s.id);
+          return {
+            ...s,
+            role: s.role || 'staff',
+            phone_number: s.phone_number || driverInfo?.phone,
+            license_number: driverInfo?.license_number,
+            assigned_bus_id: driverInfo?.assigned_bus_id,
+            buses: driverInfo?.buses,
+            driver_id: driverInfo?.id // Store the driver table ID for specific actions
+          };
+      });
+      setStaffMembers(filteredStaff);
       setSites(siteRes.data || []);
 
       // Step 2: fetch bookings filtered by the agency's trip IDs (correct PostgREST pattern)
@@ -198,17 +245,22 @@ export function AgencyDashboard() {
     };
     fetchStopsAndCategories();
 
-    window.addEventListener('refresh-buses', () => fetchData(true));
-    window.addEventListener('refresh-trips', () => fetchData(true));
-    window.addEventListener('refresh-drivers', () => fetchData(true));
-    window.addEventListener('refresh-staff', () => fetchData(true));
-    window.addEventListener('refresh-sites', () => fetchData(true));
+    const refreshHandler = () => fetchData(true);
+    window.addEventListener('refresh-buses', refreshHandler);
+    window.addEventListener('refresh-trips', refreshHandler);
+    window.addEventListener('refresh-drivers', refreshHandler);
+    window.addEventListener('refresh-staff', refreshHandler);
+    window.addEventListener('refresh-sites', refreshHandler);
     window.addEventListener('refresh-stops', fetchStopsAndCategories);
     window.addEventListener('refresh-categories', fetchStopsAndCategories);
     
     return () => { 
       supabase.removeChannel(channel); 
-      window.removeEventListener('refresh-staff', () => fetchData(true));
+      window.removeEventListener('refresh-buses', refreshHandler);
+      window.removeEventListener('refresh-trips', refreshHandler);
+      window.removeEventListener('refresh-drivers', refreshHandler);
+      window.removeEventListener('refresh-staff', refreshHandler);
+      window.removeEventListener('refresh-sites', refreshHandler);
       window.removeEventListener('refresh-stops', fetchStopsAndCategories);
       window.removeEventListener('refresh-categories', fetchStopsAndCategories);
     };
@@ -235,6 +287,27 @@ export function AgencyDashboard() {
       fetchData(true);
     } catch (e: any) {
       toast.error("Erreur: " + e.message);
+    }
+  };
+
+  const handleEndTrip = async () => {
+    if (!endTripModal.trip) return;
+    setIsEndingTrip(true);
+    try {
+      const { error } = await supabase
+        .from('trips')
+        .update({ status: 'completed' })
+        .eq('id', endTripModal.trip.id);
+      if (error) throw error;
+      toast.success('🏁 Voyage terminé avec succès !', {
+        description: `${endTripModal.trip.origin?.name} → ${endTripModal.trip.destination?.name} a été marqué comme complété.`
+      });
+      setEndTripModal({ open: false, trip: null });
+      fetchData(true);
+    } catch (e: any) {
+      toast.error('Erreur: ' + e.message);
+    } finally {
+      setIsEndingTrip(false);
     }
   };
 
@@ -284,11 +357,19 @@ export function AgencyDashboard() {
 
   const deleteStaff = async (id: string, role: string) => {
     if (role === 'superuser') return;
-    if (!confirm('Voulez-vous vraiment retirer ce membre du personnel ?')) return;
+    if (!confirm('Voulez-vous vraiment retirer ce membre du personnel de votre agence ?')) return;
     
     try {
-      const { error } = await supabase.from('profiles').update({ agency_id: null }).eq('id', id);
+      // 1. Remove from profiles (sever link with agency)
+      const { error } = await supabase.from('profiles').update({ agency_id: null, site_id: null }).eq('id', id);
       if (error) throw error;
+      
+      // 2. If it's a driver, we also remove the driver table entry as it's linked to this agency
+      if (role === 'driver') {
+          const { error: dError } = await supabase.from('drivers').delete().eq('user_id', id);
+          if (dError) console.error("Could not delete driver record:", dError.message);
+      }
+
       toast.success('Membre retiré de l\'agence');
       fetchData(true);
     } catch (e: any) {
@@ -330,10 +411,9 @@ export function AgencyDashboard() {
 
   const tabs = [
     { id: 'overview', label: 'Aperçu', icon: BarChart3 },
+    { id: 'personnel', label: `Personnel (${staffMembers.length})`, icon: Users },
     { id: 'buses', label: `Bus (${stats.buses})`, icon: Bus },
     { id: 'trips', label: `Voyages (${stats.trips})`, icon: Map },
-    { id: 'drivers', label: `Chauffeurs (${stats.drivers})`, icon: UserCheck },
-    { id: 'staff', label: `Personnel (${staffMembers.length})`, icon: Users },
     { id: 'sites', label: `Sites/Points vente (${sites.length})`, icon: Building },
     { id: 'bookings', label: `Réservations (${stats.bookings})`, icon: Ticket },
     { id: 'stops', label: `Arrêts (${stops.length})`, icon: Map },
@@ -413,9 +493,9 @@ export function AgencyDashboard() {
           { label: 'Bus', value: stats.buses, icon: Bus, color: 'bg-lime-50 text-lime-700', tab: 'buses' },
           { label: 'Voyages', value: stats.trips, icon: Map, color: 'bg-blue-50 text-blue-700', tab: 'trips' },
           { label: 'Sites', value: sites.length, icon: Building, color: 'bg-cyan-50 text-cyan-700', tab: 'sites' },
-          { label: 'Chauffeurs', value: stats.drivers, icon: Users, color: 'bg-purple-50 text-purple-700', tab: 'drivers' },
+          { label: 'Personnel', value: staffMembers.length, icon: Users, color: 'bg-purple-50 text-purple-700', tab: 'personnel' },
           { label: 'Réservations', value: stats.bookings, icon: Ticket, color: 'bg-pink-50 text-pink-700', tab: 'bookings' },
-          { label: 'Revenus (CDF)', value: stats.revenue.toLocaleString('fr-CD'), icon: BarChart3, color: 'bg-orange-50 text-orange-700', tab: 'bookings' },
+          { label: 'Revenus (CDF)', value: (stats.revenue || 0).toLocaleString('fr-CD'), icon: BarChart3, color: 'bg-orange-50 text-orange-700', tab: 'bookings' },
         ].map((s, i) => (
           <motion.div key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
             onClick={() => setActiveTab(s.tab as TabType)}
@@ -524,7 +604,10 @@ export function AgencyDashboard() {
           {activeTab === 'trips' && (
             <div className="card-elevated p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-h4 font-bold">Voyages Programmés</h2>
+                <div>
+                  <h2 className="text-h4 font-bold">Voyages Programmés</h2>
+                  <p className="text-xs text-tertiary mt-0.5">Suivi bus en temps réel • Terminez un voyage depuis cette vue</p>
+                </div>
                 <button onClick={() => { setEditingTrip(null); setIsTripFormOpen(true); }} className="btn-primary px-4 py-2 rounded-lg flex items-center gap-2 text-body-small font-bold shadow-kongo-lime">
                   <Plus className="w-4 h-4" /> Nouveau Voyage
                 </button>
@@ -532,176 +615,204 @@ export function AgencyDashboard() {
               <div className="space-y-3">
                 {trips.length === 0 ? (
                   <p className="text-center text-tertiary py-8 text-body-small">Aucun voyage. <button onClick={() => setIsTripFormOpen(true)} className="text-kongo-lime font-bold hover:underline">Créer le premier</button></p>
-                ) : trips.map(t => (
-                  <div key={t.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                ) : trips.map(t => {
+                  const canEnd = ['in_progress', 'departed', 'scheduled'].includes(t.status);
+                  const isCompleted = t.status === 'completed';
+                  const isCancelled = t.status === 'cancelled';
+                  return (
+                  <div key={t.id} className={`flex items-center justify-between p-4 rounded-xl transition-colors border ${
+                    t.status === 'in_progress' ? 'bg-green-50 border-green-200 hover:bg-green-100' :
+                    t.status === 'departed' ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' :
+                    isCompleted ? 'bg-gray-50 border-gray-200 opacity-70' :
+                    isCancelled ? 'bg-red-50 border-red-100 opacity-60' :
+                    'bg-gray-50 border-transparent hover:bg-gray-100'
+                  }`}>
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center"><Map className="w-5 h-5 text-blue-500" /></div>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        t.status === 'in_progress' ? 'bg-green-100' :
+                        t.status === 'departed' ? 'bg-blue-100' :
+                        isCompleted ? 'bg-gray-100' : 'bg-blue-50'
+                      }`}>
+                        <Map className={`w-5 h-5 ${
+                          t.status === 'in_progress' ? 'text-green-600' :
+                          t.status === 'departed' ? 'text-blue-600' :
+                          isCompleted ? 'text-gray-400' : 'text-blue-500'
+                        }`} />
+                      </div>
                       <div>
                         <p className="font-bold text-kongo-black">{t.origin?.name} → {t.destination?.name}</p>
                         <p className="text-xs text-tertiary">{new Date(t.departure_time).toLocaleString('fr-CD', { dateStyle: 'short', timeStyle: 'short' })} • {t.seats_available}/{t.total_seats} places</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       <div className="text-right">
                         <p className="font-bold text-kongo-black text-body-small">{t.price?.toLocaleString()} CDF</p>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${getStatusBadge(t.status)}`}>{t.status}</span>
                       </div>
                       <div className="flex gap-1">
+                        {canEnd && (
+                          <button
+                            onClick={() => setEndTripModal({ open: true, trip: t })}
+                            title="Terminer ce voyage"
+                            className="p-2 bg-white rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-400 transition-all flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider"
+                          >
+                            <Flag className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Terminer</span>
+                          </button>
+                        )}
                         <button onClick={() => { setEditingTrip(t); setIsTripFormOpen(true); }} className="p-2 bg-white rounded-lg border border-border-primary hover:text-kongo-lime transition-colors"><Pencil className="w-4 h-4" /></button>
                         <button onClick={() => handleDeleteTrip(t.id)} className="p-2 bg-white rounded-lg border border-border-primary hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* STAFF */}
-          {activeTab === 'staff' && (
-            <div className="card-elevated p-6">
-              <div className="flex items-center justify-between mb-6">
+          {/* PERSONNEL UNIFIED */}
+          {activeTab === 'personnel' && (
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 card-elevated p-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center">
-                        <Users className="w-5 h-5 text-indigo-600" />
+                    <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center">
+                        <Users className="w-6 h-6 text-indigo-600" />
                     </div>
                     <div>
-                        <h2 className="text-h4 font-bold">Personnel & Rôles</h2>
-                        <p className="text-xs text-tertiary">Gérez les accès de votre équipe (Chefs, Caissiers, Admin).</p>
+                        <h2 className="text-h4 font-black text-kongo-black">Gestion du Personnel</h2>
+                        <p className="text-xs text-tertiary">Filtrez par rôle pour gérer vos équipes.</p>
                     </div>
                 </div>
-                <button onClick={() => { setEditingStaff(null); setIsStaffFormOpen(true); }} className="btn-primary px-4 py-2 rounded-lg flex items-center gap-2 text-body-small font-bold shadow-kongo-lime">
-                  <Plus className="w-4 h-4" /> Ajouter Personnel
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {staffMembers.length === 0 ? (
-                  <p className="text-center text-tertiary py-8 text-body-small col-span-full">Aucun membre du personnel trouvé.</p>
-                ) : staffMembers.filter(s => s.role !== 'driver').map(s => (
-                  <div key={s.id} className="p-4 bg-white rounded-2xl border border-border-secondary hover:border-indigo-300 hover:shadow-md transition-all group flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                          <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-lg">
-                              {s.full_name?.slice(0, 2).toUpperCase() || '??'}
-                          </div>
-                          <div className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                              s.role === 'chef' ? 'bg-purple-100 text-purple-700' : 
-                                               s.role === 'agency' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-700'
-                          }`}>
-                              {s.role === 'chef' ? 'Chef d\'Agence' : 
-                               s.role === 'cashier' ? 'Caissier' : 
-                               s.role === 'agency' ? 'Administrateur' : s.role}
-                          </div>
-                      </div>
-                      <div>
-                          <p className="font-bold text-kongo-black text-body truncate">{s.full_name}</p>
-                          <p className="text-xs text-tertiary truncate">{s.email}</p>
-                          {s.site_id && (
-                              <div className="flex items-center gap-1.5 mt-2 bg-gray-50 p-2 rounded-lg border border-border-secondary">
-                                  <Building className="w-3 h-3 text-secondary" />
-                                  <span className="text-[10px] font-bold text-secondary uppercase truncate">
-                                      Site: {s.agency_sites?.[0]?.name || 'Inconnu'}
-                                  </span>
-                              </div>
-                          )}
-                      </div>
-                    </div>
-                    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-                        <p className="text-[10px] text-tertiary uppercase font-bold">Arrivée {getTimeAgo(s.created_at)}</p>
-                        <div className="flex gap-1">
-                          <button 
-                              onClick={() => { setEditingStaff(s); setIsStaffFormOpen(true); }}
-                              className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                          >
-                              <Pencil className="w-4 h-4" />
-                          </button>
-                          <button 
-                              onClick={() => deleteStaff(s.id, s.role || 'user')}
-                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                              <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {staffMembers.length > 0 && staffMembers.some(s => s.role === 'driver') && (
-                <div className="mt-8">
-                    <h3 className="text-label font-black text-tertiary uppercase tracking-widest mb-4">Aussi présents dans l'onglet Chauffeurs</h3>
-                    <div className="flex flex-wrap gap-2">
-                        {staffMembers.filter(s => s.role === 'driver').map(s => (
-                            <div key={s.id} className="px-3 py-1.5 bg-gray-100 text-secondary text-xs rounded-lg font-bold border border-border-secondary">
-                                👨‍✈️ {s.full_name}
-                            </div>
+                <div className="flex flex-wrap gap-2">
+                    <div className="flex bg-gray-100 p-1 rounded-xl">
+                        {[
+                            { id: 'all', label: 'Tous' },
+                            { id: 'driver', label: 'Chauffeurs' },
+                            { id: 'cashier', label: 'Vendeurs' },
+                            { id: 'chef', label: 'Chefs' },
+                            { id: 'agency', label: 'Admins' }
+                        ].map(f => (
+                            <button
+                                key={f.id}
+                                onClick={() => setPersonnelFilter(f.id)}
+                                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                                    personnelFilter === f.id 
+                                    ? 'bg-white text-kongo-black shadow-sm' 
+                                    : 'text-tertiary hover:text-kongo-black'
+                                }`}
+                            >
+                                {f.label}
+                            </button>
                         ))}
                     </div>
+                    <Button 
+                        onClick={() => { setEditingStaff(null); setIsStaffFormOpen(true); }}
+                        className="bg-kongo-black text-white hover:bg-neutral-800 rounded-xl font-bold h-9 px-4"
+                    >
+                        <Plus className="mr-2 h-4 w-4" /> Ajouter
+                    </Button>
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* DRIVERS */}
-          {activeTab === 'drivers' && (
-            <div className="card-elevated p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-h4 font-bold">Mon Équipe</h2>
-                <button onClick={() => setIsDriverFormOpen(true)} className="btn-primary px-4 py-2 rounded-lg flex items-center gap-2 text-body-small font-bold shadow-kongo-lime">
-                  <Plus className="w-4 h-4" /> Ajouter Chauffeur
-                </button>
               </div>
-              <div className="space-y-3">
-                {drivers.length === 0 ? (
-                  <p className="text-center text-tertiary py-8 text-body-small">Aucun chauffeur. <button onClick={() => setIsDriverFormOpen(true)} className="text-kongo-lime font-bold hover:underline">Ajouter</button></p>
-                ) : drivers.map(d => (
-                  <div key={d.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-kongo-black text-kongo-lime flex items-center justify-center font-black text-sm">
-                        {d.full_name.slice(0, 2).toUpperCase()}
-                      </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {(staffMembers || [])
+                  .filter(s => personnelFilter === 'all' || s.role === personnelFilter)
+                  .map((staff) => (
+                    <motion.div key={staff.id} layout className="bg-white p-5 rounded-3xl border border-neutral-100 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden flex flex-col justify-between min-h-[220px]">
                       <div>
-                        <p className="font-bold text-kongo-black">{d.full_name}</p>
-                        <p className="text-xs text-tertiary">
-                          {d.phone} {d.license_number ? `• Permis: ${d.license_number}` : ''}
-                        </p>
-                        {d.buses ? (
-                          <p className="text-xs text-lime-600 font-bold mt-0.5">🚌 {d.buses.name} ({d.buses.plate_number})</p>
+                        <div className="flex justify-between items-start mb-4 relative z-10">
+                          <div className="h-12 w-12 rounded-2xl bg-neutral-100 flex items-center justify-center text-kongo-black font-black text-lg shadow-inner">
+                            {staff.full_name?.charAt(0) || 'U'}
+                          </div>
+                          <div className="flex gap-1.5">
+                            <button 
+                                onClick={() => { setEditingStaff(staff); setIsStaffFormOpen(true); }} 
+                                className="p-2 bg-neutral-50 rounded-xl hover:text-kongo-lime transition-colors border border-neutral-100 shadow-sm"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button 
+                                onClick={() => deleteStaff(staff.id, staff.role || '')} 
+                                className="p-2 bg-neutral-50 rounded-xl hover:text-red-500 transition-colors border border-neutral-100 shadow-sm"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <div className="relative z-10">
+                          <h3 className="font-black text-lg text-kongo-black mb-1 truncate">{staff.full_name}</h3>
+                          <div className="flex flex-wrap items-center gap-2 mb-3">
+                            <Badge variant="secondary" className={`text-[10px] uppercase font-black px-2 tracking-widest ${
+                                staff.role === 'driver' ? 'bg-purple-50 text-purple-600' : 
+                                staff.role === 'cashier' ? 'bg-blue-50 text-blue-600' : 
+                                staff.role === 'chef' ? 'bg-amber-50 text-amber-600' : 
+                                staff.role === 'agency' ? 'bg-indigo-50 text-indigo-600' : 'bg-neutral-50 text-tertiary'
+                            }`}>
+                              {staff.role === 'driver' ? 'Chauffeur' : 
+                               staff.role === 'cashier' ? 'Agent Vente' : 
+                               staff.role === 'chef' ? 'Chef Agence' : 
+                               staff.role === 'agency' ? 'Admin' : staff.role}
+                            </Badge>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex items-center text-xs text-tertiary">
+                                <Search size={12} className="mr-2 opacity-50" />
+                                {staff.email || 'Pas d\'email'}
+                            </div>
+                            {staff.phone_number && (
+                                <div className="flex items-center text-xs text-tertiary">
+                                    <Phone size={12} className="mr-2 opacity-50" />
+                                    {staff.phone_number}
+                                </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-neutral-50 relative z-10">
+                        {staff.role === 'driver' ? (
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center text-xs font-bold text-kongo-black">
+                                        <Bus size={14} className="mr-2 text-purple-500" />
+                                        {staff.buses?.name || 'Aucun bus'} 
+                                    </div>
+                                    <button 
+                                        onClick={() => setAssignModal({ open: true, driver: { ...staff, id: staff.driver_id } })}
+                                        className="text-[10px] font-black text-purple-600 hover:underline cursor-pointer"
+                                    >
+                                        AFFECTER
+                                    </button>
+                                </div>
+                                {staff.license_number && (
+                                    <div className="text-[10px] text-tertiary font-bold bg-neutral-50 p-1.5 rounded-lg flex items-center gap-1.5">
+                                        <Shield size={10} /> PERMIS: {staff.license_number}
+                                    </div>
+                                )}
+                            </div>
                         ) : (
-                          <p className="text-xs text-orange-500 font-bold mt-0.5">⚠ Non affecté à un bus</p>
+                            <div className="flex items-center gap-2 text-[10px] text-tertiary font-bold bg-neutral-50 p-2 rounded-xl">
+                                <Building size={12} />
+                                {staff.agency_sites?.[0]?.name || 'Pas d\'affectation site'}
+                            </div>
                         )}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2 py-1 rounded-full font-bold ${getStatusBadge(d.status)}`}>{d.status}</span>
                       
-                      {d.assigned_bus_id && (
-                        <button
-                          onClick={() => assignDriverToBus(d.id, null)}
-                          title="Séparer / Retirer le bus"
-                          className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center hover:bg-orange-100 transition-colors"
-                        >
-                          <UserX className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => setAssignModal({ open: true, driver: d })}
-                        title="Affecter à un bus"
-                        className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 transition-colors"
-                      >
-                        <UserCheck className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => deleteDriver(d.id)}
-                        title="Supprimer"
-                        className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                      {/* Decoration */}
+                      <Users className="absolute -bottom-6 -right-6 w-24 h-24 text-neutral-50 opacity-40 pointer-events-none" />
+                    </motion.div>
+                  ))}
+                
+                {staffMembers.filter(s => personnelFilter === 'all' || s.role === personnelFilter).length === 0 && (
+                   <div className="col-span-full py-20 text-center bg-gray-50/50 rounded-3xl border-2 border-dashed border-gray-200">
+                      <Users className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                      <h3 className="text-lg font-black text-kongo-black">Aucun membre trouvé</h3>
+                      <p className="text-xs text-tertiary max-w-xs mx-auto mt-1">Changez le filtre ou ajoutez un nouveau membre.</p>
+                   </div>
+                )}
               </div>
             </div>
           )}
@@ -774,8 +885,12 @@ export function AgencyDashboard() {
                 ) : stops.map(s => (
                   <div key={s.id} className="p-4 border border-border-secondary rounded-xl flex justify-between items-center group bg-white hover:border-kongo-lime transition-colors">
                     <div>
-                      <p className="font-bold text-kongo-black text-body">{s.name}</p>
-                      <p className="text-xs text-tertiary mt-1">Ville/Province: {s.city_name} {s.address ? `• ${s.address}` : ''}</p>
+                      <p className="font-bold text-kongo-black text-body flex items-center gap-2 flex-wrap">
+                        <span>{s.name}</span>
+                        <span className="text-xs text-tertiary font-medium">
+                          Ville/Province: {s.city_name} {s.address ? `• ${s.address}` : ''}
+                        </span>
+                      </p>
                     </div>
                     <div className="flex gap-2">
                       <button 
@@ -931,6 +1046,82 @@ export function AgencyDashboard() {
         </motion.div>
       </AnimatePresence>
 
+      {/* Modal Fin de Voyage */}
+      <Dialog open={endTripModal.open} onOpenChange={(open: boolean) => !open && !isEndingTrip && setEndTripModal({ open: false, trip: null })}>
+        <DialogContent className="sm:max-w-[440px] p-0 overflow-hidden border-none shadow-2xl">
+          {/* En-tête rouge */}
+          <div className="bg-gradient-to-br from-red-600 to-rose-700 p-8 text-center relative overflow-hidden">
+            <div className="absolute inset-0 opacity-10">
+              <Flag className="w-40 h-40 absolute -right-8 -bottom-8 rotate-12 text-white" />
+            </div>
+            <div className="relative z-10">
+              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+                <Flag className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-h4 font-black text-white tracking-tight">Terminer le Voyage</h3>
+              <p className="text-[11px] text-white/70 mt-1 font-bold uppercase tracking-widest">Suivi Bus • Action irréversible</p>
+            </div>
+          </div>
+
+          {/* Corps */}
+          <div className="p-6 bg-white space-y-5">
+            {endTripModal.trip && (
+              <div className="bg-gray-50 rounded-2xl p-4 border border-border-secondary">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <Map className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="font-black text-kongo-black">{endTripModal.trip.origin?.name} → {endTripModal.trip.destination?.name}</p>
+                    <p className="text-xs text-tertiary">{new Date(endTripModal.trip.departure_time).toLocaleString('fr-CD', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className={`px-2 py-0.5 rounded-full font-bold ${getStatusBadge(endTripModal.trip.status)}`}>
+                    {endTripModal.trip.status}
+                  </span>
+                  <span className="text-tertiary">•</span>
+                  <span className="text-tertiary">{endTripModal.trip.seats_available}/{endTripModal.trip.total_seats} places disponibles</span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-200">
+              <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-black text-amber-800">Cette action est définitive</p>
+                <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                  Le statut du voyage passera à <strong>"Complété"</strong>. Les passagers seront notifiés et le voyage ne sera plus modifiable.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="p-6 pt-0 bg-white flex gap-3">
+            <Button
+              onClick={() => setEndTripModal({ open: false, trip: null })}
+              variant="outline"
+              disabled={isEndingTrip}
+              className="flex-1 rounded-xl font-bold border-border-primary"
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleEndTrip}
+              disabled={isEndingTrip}
+              className="flex-1 rounded-xl font-black bg-red-600 hover:bg-red-700 text-white shadow-lg"
+            >
+              {isEndingTrip ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Traitement...</>
+              ) : (
+                <><Flag className="w-4 h-4 mr-2" />Confirmer la fin
+              </> 
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal Affectation Bus */}
       <Dialog open={assignModal.open} onOpenChange={(open: boolean) => !open && setAssignModal({ open: false, driver: null })}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] p-0 overflow-hidden border-none shadow-2xl flex flex-col">
@@ -1054,7 +1245,6 @@ export function AgencyDashboard() {
       {/* Forms */}
       <AddBusForm isOpen={isBusFormOpen} onClose={() => { setIsBusFormOpen(false); setEditingBus(null); fetchData(true); }} agencyId={agencyId!} initialData={editingBus} />
       <AddTripForm isOpen={isTripFormOpen} onClose={() => { setIsTripFormOpen(false); setEditingTrip(null); fetchData(true); }} agencyId={agencyId!} initialData={editingTrip} />
-      <AddDriverForm isOpen={isDriverFormOpen} onClose={() => { setIsDriverFormOpen(false); fetchData(true); }} agencyId={agencyId!} />
       <AddStopForm 
         isOpen={isStopFormOpen} 
         onClose={() => { setIsStopFormOpen(false); fetchData(); setEditingStop(null); }} 
@@ -1082,3 +1272,4 @@ export function AgencyDashboard() {
     </div>
   );
 }
+

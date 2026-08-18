@@ -6385,12 +6385,12 @@
 }
 
 .btn-primary {
-  background-color: var(--kongo-black);
-  color: var(--text-on-black);
+  background-color: var(--kongo-black) !important;
+  color: var(--text-on-black) !important;
   font-weight: var(--font-weight-semibold);
   padding: var(--space-3) var(--space-6);
   border-radius: var(--radius-base);
-  border: 1px solid var(--kongo-black);
+  border: 1px solid var(--kongo-black) !important;
   cursor: pointer;
   font-size: 1rem;
   line-height: 1.4;
@@ -6398,8 +6398,8 @@
 }
 
 .btn-primary:hover {
-  background-color: var(--kongo-black-hover);
-  border-color: var(--kongo-black-hover);
+  background-color: var(--kongo-black-hover) !important;
+  border-color: var(--kongo-black-hover) !important;
   box-shadow: var(--shadow-kongo-black);
   transform: translateY(-1px);
 }
@@ -6516,6 +6516,64 @@
 .btn-ghost:hover {
   background-color: var(--surface-hover);
   color: var(--text-primary);
+}
+
+.btn-surface {
+  background-color: var(--surface-primary);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-base);
+  border: 1px solid var(--border-primary);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1.4;
+  transition: all .15s ease-in-out;
+}
+
+.btn-surface:hover {
+  background-color: var(--surface-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-dark-ghost {
+  color: var(--text-on-black);
+  font-weight: var(--font-weight-medium);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-base);
+  cursor: pointer;
+  background-color: #0000;
+  border: 1px solid #0000;
+  font-size: 1rem;
+  line-height: 1.4;
+  transition: all .15s ease-in-out;
+}
+
+.btn-dark-ghost:hover {
+  background-color: #ffffff14;
+  color: var(--text-on-black);
+}
+
+.btn-dark-outline {
+  color: var(--text-on-black);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-base);
+  border: 1px solid #ffffff26;
+  cursor: pointer;
+  background-color: #ffffff08;
+  font-size: 1rem;
+  line-height: 1.4;
+  transition: all .15s ease-in-out;
+}
+
+.btn-dark-outline:hover {
+  background-color: #ffffff14;
+  border-color: #ffffff3d;
+  color: var(--text-on-black);
+  box-shadow: var(--shadow-sm);
 }
 
 .card-elevated {

@@ -60,7 +60,7 @@ export function DriverDashboard() {
         .single();
 
       if (driver) {
-        setDriverId(driver.id);
+        setDriverId(user.id); // Profiles ID (matches auth.uid())
         setAssignedBus(driver.buses || null);
 
         // Load scan history

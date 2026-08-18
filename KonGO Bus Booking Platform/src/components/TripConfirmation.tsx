@@ -56,15 +56,15 @@ export function TripConfirmation({
   
 
   // Enhanced booking reference generation
-  const bookingReference = bookingData?.transactionId || `KGO${Date.now().toString().slice(-8)}`;
+  const bookingReference = bookingData?.booking_code || bookingData?.transactionId || `KGO${Date.now().toString().slice(-6)}`;
 
   // Complete booking data with all necessary info
   const completeBookingData = {
     bookingReference,
     bookingDate: bookingData?.processedAt || new Date().toISOString(),
     trip: selectedTrip || bookingData?.trip || {
-      from: searchParams?.from || bookingData?.trip?.from || "Ville de départ",
-      to: searchParams?.to || bookingData?.trip?.to || "Ville d'arrivée",
+      from: searchParams?.from || bookingData?.trip?.from || "Ville de depart",
+      to: searchParams?.to || bookingData?.trip?.to || "Ville d'arrivee",
       departure: selectedTrip?.departure || bookingData?.trip?.departure || "08:00",
       duration: selectedTrip?.duration || bookingData?.trip?.duration || "16h",
       date: searchParams?.date || bookingData?.trip?.date || new Date().toISOString().split('T')[0],
@@ -100,15 +100,15 @@ export function TripConfirmation({
     // Simulate ticket generation and confirmation sending
     const generateTicket = setTimeout(() => {
       setTicketGenerated(true);
-      toast.success("🎫 Billet numérique généré", {
-        description: "Votre QR code est prêt à l'utilisation"
+      toast.success("Billet numerique genere", {
+        description: "Votre QR code est pret a l'utilisation"
       });
     }, 1000);
 
     const sendConfirmation = setTimeout(() => {
       setConfirmationSent(true);
-      toast.success("📧 Confirmation envoyée", {
-        description: "Vérifiez votre email et SMS"
+      toast.success("Confirmation envoyee", {
+        description: "Verifiez votre email et SMS"
       });
     }, 2500);
 
@@ -142,13 +142,13 @@ export function TripConfirmation({
     setIsDownloading(true);
 
     try {
-      toast.loading("📄 Génération du billet PDF...", { id: 'pdf-gen' });
+      toast.loading("Generation du billet PDF...", { id: 'pdf-gen' });
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       const doc = new jsPDF();
       let currentY = 0;
 
-      // En-tête noire
+      // En-tete noir
       doc.setFillColor(0, 0, 0);
       doc.rect(0, 0, 210, 40, 'F');
       doc.setTextColor(190, 255, 0);
@@ -157,14 +157,14 @@ export function TripConfirmation({
       doc.text("BILLET DE VOYAGE KONGO", 105, 22, { align: "center" });
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(11);
-      doc.text(`Réf: ${bookingReference}`, 105, 34, { align: "center" });
+      doc.text(`Ref: ${bookingReference}`, 105, 34, { align: "center" });
 
-      // Séparateur
+      // Separateur
       doc.setDrawColor(190, 255, 0);
       doc.setLineWidth(1);
       doc.line(10, 45, 200, 45);
 
-      // Détails du voyage
+      // Details du voyage
       currentY = 55;
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(14);
@@ -178,38 +178,38 @@ export function TripConfirmation({
       doc.text(`De: ${completeBookingData.trip.from}`, 10, currentY);
       doc.text(`${completeBookingData.passenger.firstName} ${completeBookingData.passenger.lastName}`, 115, currentY);
       currentY += 8;
-      doc.text(`À: ${completeBookingData.trip.to}`, 10, currentY);
-      doc.text(`Tél: ${completeBookingData.passenger.phone}`, 115, currentY);
+      doc.text(`A: ${completeBookingData.trip.to}`, 10, currentY);
+      doc.text(`Tel: ${completeBookingData.passenger.phone}`, 115, currentY);
       currentY += 8;
       doc.text(`Date: ${completeBookingData.trip.date}`, 10, currentY);
       doc.text(`Email: ${completeBookingData.passenger.email}`, 115, currentY);
       currentY += 8;
-      doc.text(`Départ: ${completeBookingData.trip.departure}`, 10, currentY);
+      doc.text(`Depart: ${completeBookingData.trip.departure}`, 10, currentY);
       currentY += 8;
-      doc.text(`Durée: ${completeBookingData.trip.duration}`, 10, currentY);
+      doc.text(`Duree: ${completeBookingData.trip.duration}`, 10, currentY);
 
-      // Sièges & Paiement
+      // Sieges & Paiement
       currentY += 14;
       doc.setDrawColor(200, 200, 200);
       doc.line(10, currentY, 200, currentY);
       currentY += 8;
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
-      doc.text("SIÈGES", 10, currentY);
+      doc.text("SIEGES", 10, currentY);
       doc.text("PAIEMENT", 115, currentY);
 
       currentY += 8;
       doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
-      const seatLabels = completeBookingData.seats.map((s: any) => `${s.row}${s.column}`).join(', ') || 'Non assigné';
+      const seatLabels = completeBookingData.seats.map((s: any) => `${s.row}${s.column}`).join(', ') || 'Non assigne';
       doc.text(seatLabels, 10, currentY);
       doc.text(`Total: ${formatPrice(completeBookingData.payment.amount)}`, 115, currentY);
       currentY += 8;
-      doc.text(`Méthode: ${completeBookingData.payment.method}`, 115, currentY);
+      doc.text(`Methode: ${completeBookingData.payment.method}`, 115, currentY);
       currentY += 8;
-      doc.text("Statut: PAYÉ", 115, currentY);
+      doc.text("Statut: PAYE", 115, currentY);
 
-      // --- Section BAGAGES si présents ---
+      // --- Section BAGAGES si presents ---
       const baggage = completeBookingData.baggage;
       if (baggage && (baggage.items?.length > 0 || baggage.totalWeight)) {
         currentY += 14;
@@ -218,7 +218,7 @@ export function TripConfirmation({
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(0, 100, 0);
-        doc.text("BAGAGES ENREGISTRÉS", 10, currentY);
+        doc.text("BAGAGES ENREGISTRES", 10, currentY);
         doc.setTextColor(0, 0, 0);
 
         currentY += 8;
@@ -234,7 +234,7 @@ export function TripConfirmation({
           currentY += 7;
         }
         if (baggage.items && baggage.items.length > 0) {
-          doc.text("Détail des bagages:", 10, currentY);
+          doc.text("Detail des bagages:", 10, currentY);
           currentY += 6;
           baggage.items.forEach((item: any, idx: number) => {
             const desc = `  ${idx + 1}. ${item.type || 'Bagage'} - ${item.weight || '?'} kg${item.description ? ` (${item.description})` : ''}`;
@@ -247,13 +247,13 @@ export function TripConfirmation({
           });
         }
 
-        // Note règlements bagages
+        // Note reglements bagages
         doc.setFillColor(240, 255, 240);
         doc.rect(10, currentY, 190, 16, 'F');
         doc.setFontSize(9);
         doc.setTextColor(0, 100, 0);
-        doc.text("⚠ Présentez-vous au comptoir avec vos bagages 45 mn avant le départ.", 14, currentY + 7);
-        doc.text("Tout excédent de poids sera facturé sur place.", 14, currentY + 13);
+        doc.text("Presentez-vous au comptoir avec vos bagages 45 mn avant le depart.", 14, currentY + 7);
+        doc.text("Tout excedent de poids sera facture sur place.", 14, currentY + 13);
         doc.setTextColor(0, 0, 0);
         currentY += 22;
       }
@@ -265,22 +265,22 @@ export function TripConfirmation({
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       doc.text("Scannez le QR code sur votre application KonGO pour l'embarquement.", 105, currentY + 9, { align: "center" });
-      doc.text(`Code de vérification: ${bookingReference}`, 105, currentY + 17, { align: "center" });
+      doc.text(`Code de verification: ${bookingReference}`, 105, currentY + 17, { align: "center" });
 
       // Pied de page
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-      doc.text("Merci d'avoir choisi KonGO. Veuillez vous présenter 30 minutes avant l'heure de départ avec une pièce d'identité.", 10, 283);
+      doc.text("Merci d'avoir choisi KonGO. Veuillez vous presenter 30 minutes avant l'heure de depart avec une piece d'identite.", 10, 283);
       doc.text("KonGO Support 24/7: +243 123 456 789 | www.kongo-transport.cd", 10, 288);
 
       doc.save(`Billet-KonGO-${bookingReference}.pdf`);
 
-      toast.success("✅ Billet PDF téléchargé", {
+      toast.success("Billet PDF telecharge", {
         id: 'pdf-gen',
         description: `Fichier: Billet-KonGO-${bookingReference}.pdf`
       });
     } catch (error) {
-      toast.error("❌ Erreur lors du téléchargement", { id: 'pdf-gen' });
+      toast.error("Erreur lors du telechargement", { id: 'pdf-gen' });
     } finally {
       setIsDownloading(false);
     }
@@ -289,14 +289,14 @@ export function TripConfirmation({
   const handleShareTicket = async () => {
     const shareData = {
       title: 'Mon billet KonGO',
-      text: `🎫 Voyage KonGO: ${completeBookingData.trip.from} → ${completeBookingData.trip.to}\n📅 ${completeBookingData.trip.date} à ${completeBookingData.trip.departure}\n🪑 Sièges: ${completeBookingData.seats.map((s: any) => `${s.row}${s.column}`).join(', ')}\n📋 Réf: ${bookingReference}`,
+      text: `Voyage KonGO: ${completeBookingData.trip.from} -> ${completeBookingData.trip.to}\n${completeBookingData.trip.date} a ${completeBookingData.trip.departure}\nSieges: ${completeBookingData.seats.map((s: any) => `${s.row}${s.column}`).join(', ')}\nRef: ${bookingReference}`,
       url: `https://kongo-verify.com/${bookingReference}`
     };
 
     if (navigator.share) {
       try {
         await navigator.share(shareData);
-        toast.success("📤 Billet partagé");
+        toast.success("Billet partage");
       } catch (error: any) {
         if (error.name !== 'AbortError') {
           copyTicketInfo();
@@ -308,21 +308,21 @@ export function TripConfirmation({
   };
 
   const copyTicketInfo = () => {
-    const ticketInfo = `🎫 BILLET KONGO
-📋 Référence: ${bookingReference}
-🛣️ Voyage: ${completeBookingData.trip.from} → ${completeBookingData.trip.to}
-📅 Date: ${completeBookingData.trip.date}
-⏰ Départ: ${completeBookingData.trip.departure}
-🪑 Sièges: ${completeBookingData.seats.map((s: any) => `${s.row}${s.column}`).join(', ')}
-👤 Passager: ${completeBookingData.passenger.firstName} ${completeBookingData.passenger.lastName}
-💰 Total: ${formatPrice(completeBookingData.payment.amount)}
-🔍 Vérification: https://kongo-verify.com/${bookingReference}
+    const ticketInfo = `BILLET KONGO
+Reference: ${bookingReference}
+Voyage: ${completeBookingData.trip.from} -> ${completeBookingData.trip.to}
+Date: ${completeBookingData.trip.date}
+Depart: ${completeBookingData.trip.departure}
+Sieges: ${completeBookingData.seats.map((s: any) => `${s.row}${s.column}`).join(', ')}
+Passager: ${completeBookingData.passenger.firstName} ${completeBookingData.passenger.lastName}
+Total: ${formatPrice(completeBookingData.payment.amount)}
+Verification: https://kongo-verify.com/${bookingReference}
 
-🚌 KonGO - Transport RDC
-📞 Support: +243 123 456 789`;
+KonGO - Transport RDC
+Support: +243 123 456 789`;
 
     navigator.clipboard.writeText(ticketInfo);
-    toast.success("📋 Informations copiées");
+    toast.success("Informations copiees");
   };
 
   const handleAddToCalendar = () => {
@@ -333,10 +333,10 @@ export function TripConfirmation({
     const durationHours = parseInt(completeBookingData.trip.duration.replace('h', ''));
     const endDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000);
 
-    const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`🚌 Voyage KonGO: ${completeBookingData.trip.from} → ${completeBookingData.trip.to}`)}&dates=${startDate.toISOString().replace(/[-:]/g, '').split('.')[0]}Z/${endDate.toISOString().replace(/[-:]/g, '').split('.')[0]}Z&location=${encodeURIComponent(`Gare routière, ${completeBookingData.trip.from}`)}`;
+    const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Voyage KonGO: ${completeBookingData.trip.from} -> ${completeBookingData.trip.to}`)}&dates=${startDate.toISOString().replace(/[-:]/g, '').split('.')[0]}Z/${endDate.toISOString().replace(/[-:]/g, '').split('.')[0]}Z&location=${encodeURIComponent(`Gare routiere, ${completeBookingData.trip.from}`)}`;
 
     window.open(calendarUrl, '_blank');
-    toast.success("📅 Évènement ajouté au calendrier");
+    toast.success("Evenement ajoute au calendrier");
   };
 
 
@@ -362,10 +362,10 @@ export function TripConfirmation({
 
           <div className="space-y-3">
             <h1 className="text-display-2 text-kongo-black font-bold leading-tight">
-              Réservation Confirmée !
+              Reservation confirmee !
             </h1>
             <p className="text-body-large text-secondary max-w-2xl mx-auto">
-              Votre voyage avec KonGO est confirmé. Billet numérique et QR code générés avec succès.
+              Votre voyage avec KonGO est confirme. Billet numerique et QR code generes avec succes.
             </p>
 
             <motion.div
@@ -376,7 +376,7 @@ export function TripConfirmation({
             >
               <Badge className="status-success px-4 py-2">
                 <Shield className="w-4 h-4 mr-2" />
-                Paiement confirmé
+                Paiement confirme
               </Badge>
               {confirmationSent && (
                 <motion.div
@@ -386,7 +386,7 @@ export function TripConfirmation({
                 >
                   <Badge className="status-kongo px-4 py-2">
                     <Ticket className="w-4 h-4 mr-2" />
-                    Billet généré
+                    Billet genere
                   </Badge>
                 </motion.div>
               )}
@@ -411,11 +411,11 @@ export function TripConfirmation({
                     <div className="flex flex-col items-start translate-y-[-4px]">
                       <KonGOLogo variant="full" size="md" />
                       <div className="text-on-black text-[9px] font-bold mt-1 uppercase tracking-tighter opacity-70 border-l border-kongo-lime pl-2 leading-none">
-                        Opéré par {completeBookingData.trip.operator}
+                        Opere par {completeBookingData.trip.operator}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-body-small text-on-black opacity-90">Référence</div>
+                      <div className="text-body-small text-on-black opacity-90">Reference</div>
                       <div className="text-h5 text-kongo-lime font-bold">{bookingReference}</div>
                     </div>
                   </div>
@@ -426,7 +426,7 @@ export function TripConfirmation({
                       <div className="text-h3 text-on-black font-bold mb-1 uppercase">
                         {completeBookingData.trip.from}
                       </div>
-                      <div className="text-body-small text-on-black opacity-75">Départ</div>
+                      <div className="text-body-small text-on-black opacity-75">Depart</div>
                       <div className="text-body text-kongo-lime font-semibold">
                         {completeBookingData.trip.departure}
                       </div>
@@ -436,7 +436,7 @@ export function TripConfirmation({
                       <div className="relative">
                         <div className="h-px bg-kongo-lime"></div>
                         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-kongo-lime rounded-full flex items-center justify-center">
-                          <span className="text-kongo-black font-bold text-sm">🚌</span>
+                          <span className="text-kongo-black font-bold text-sm">K</span>
                         </div>
                       </div>
                       <div className="text-center text-body-small text-on-black opacity-75 mt-2">
@@ -448,7 +448,7 @@ export function TripConfirmation({
                       <div className="text-h3 text-on-black font-bold mb-1 uppercase">
                         {completeBookingData.trip.to}
                       </div>
-                      <div className="text-body-small text-on-black opacity-75">Arrivée</div>
+                      <div className="text-body-small text-on-black opacity-75">Arrivee</div>
                       <div className="text-body text-kongo-lime font-semibold">
                         {(() => {
                           try {
@@ -492,7 +492,7 @@ export function TripConfirmation({
                     </div>
 
                     <div>
-                      <div className="text-label-small text-tertiary mb-2">SIÈGES</div>
+                      <div className="text-label-small text-tertiary mb-2">SIEGES</div>
                       <div className="flex flex-wrap gap-2">
                         {completeBookingData.seats.map((seat: any, index: number) => (
                           <div key={index} className="flex items-center space-x-1">
@@ -512,7 +512,7 @@ export function TripConfirmation({
                       <div className="text-h4 text-kongo-black font-bold">
                         {formatPrice(completeBookingData.payment.amount)}
                       </div>
-                      <div className="text-body-small text-success">✓ Payé</div>
+                      <div className="text-body-small text-success">Paye</div>
                     </div>
                   </div>
 
@@ -532,7 +532,7 @@ export function TripConfirmation({
                       <div className="flex items-center space-x-3">
                         <Phone className="w-4 h-4 text-secondary" />
                         <div>
-                          <div className="text-body-small text-secondary">Téléphone</div>
+                          <div className="text-body-small text-secondary">Telephone</div>
                           <div className="text-body text-kongo-black">
                             {completeBookingData.passenger.phone}
                           </div>
@@ -544,7 +544,7 @@ export function TripConfirmation({
                       <div className="flex items-center space-x-3">
                         <CreditCard className="w-4 h-4 text-secondary" />
                         <div>
-                          <div className="text-body-small text-secondary">Méthode de paiement</div>
+                          <div className="text-body-small text-secondary">Methode de paiement</div>
                           <div className="text-body text-kongo-black">
                             {(() => {
                               const methodNames: Record<string, string> = {
@@ -562,7 +562,7 @@ export function TripConfirmation({
                       <div className="flex items-center space-x-3">
                         <Calendar className="w-4 h-4 text-secondary" />
                         <div>
-                          <div className="text-body-small text-secondary">Réservé le</div>
+                          <div className="text-body-small text-secondary">Reserve le</div>
                           <div className="text-body text-kongo-black">
                             {formatDateTime(completeBookingData.bookingDate)}
                           </div>
@@ -599,10 +599,10 @@ export function TripConfirmation({
                         <Clock className="w-5 h-5 text-kongo-lime-dark mt-0.5" />
                         <div>
                           <div className="text-body-small font-medium text-kongo-lime-dark mb-1">
-                            Arrivée recommandée
+                            Arrivee recommandee
                           </div>
                           <div className="text-body-small text-kongo-lime-dark">
-                            Présentez-vous 30 minutes avant le départ avec une pièce d'identité valide
+                            Presentez-vous 30 minutes avant le depart avec une piece d'identite valide
                           </div>
                         </div>
                       </div>
@@ -613,10 +613,10 @@ export function TripConfirmation({
                         <MapPin className="w-5 h-5 text-secondary mt-0.5" />
                         <div>
                           <div className="text-body-small font-medium text-kongo-black mb-1">
-                            Point de départ
+                            Point de depart
                           </div>
                           <div className="text-body-small text-secondary">
-                            Gare routière centrale - {completeBookingData.trip.from}
+                            Gare routiere centrale - {completeBookingData.trip.from}
                           </div>
                         </div>
                       </div>
@@ -629,10 +629,10 @@ export function TripConfirmation({
                         <Smartphone className="w-5 h-5 text-secondary mt-0.5" />
                         <div>
                           <div className="text-body-small font-medium text-kongo-black mb-1">
-                            Billet numérique
+                            Billet numerique
                           </div>
                           <div className="text-body-small text-secondary">
-                            Présentez ce billet sur votre téléphone ou imprimez-le
+                            Presentez ce billet sur votre telephone ou imprimez-le
                           </div>
                         </div>
                       </div>
@@ -693,10 +693,10 @@ export function TripConfirmation({
 
                 <div className="space-y-2">
                   <p className="text-body-small text-secondary">
-                    Scannez ce code à l'embarquement
+                    Scannez ce code a l'embarquement
                   </p>
                   <p className="text-caption text-tertiary">
-                    Référence: {bookingReference}
+                    Reference: {bookingReference}
                   </p>
                 </div>
 
@@ -728,12 +728,12 @@ export function TripConfirmation({
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                         className="w-4 h-4 border-2 border-kongo-black border-t-transparent rounded-full mr-2"
                       />
-                      Téléchargement...
+                      Telechargement...
                     </>
                   ) : (
                     <>
                       <Download className="w-4 h-4 mr-2" />
-                      Télécharger
+                      Telecharger
                     </>
                   )}
                 </Button>
@@ -773,7 +773,7 @@ export function TripConfirmation({
                     Support 24/7
                   </div>
                   <div className="text-body-small text-kongo-lime-dark mb-4">
-                    Une question ? Notre équipe est là pour vous aider
+                    Une question ? Notre equipe est la pour vous aider
                   </div>
                   <Button
                     onClick={() => window.open('tel:+243123456789', '_self')}
@@ -791,3 +791,4 @@ export function TripConfirmation({
     </div>
   );
 }
+
