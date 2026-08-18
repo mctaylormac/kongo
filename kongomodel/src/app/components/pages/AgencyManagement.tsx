@@ -31,6 +31,7 @@ export function AgencyManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAgency, setSelectedAgency] = useState<Agency | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<'all' | 'featured' | 'active' | 'suspended'>('all');
   
   // Form State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,6 +49,13 @@ export function AgencyManagement() {
 
   useEffect(() => {
     fetchAgencies();
+    const updateTabFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'featured') {
+        setActiveTab('featured');
+      }
+    };
+    updateTabFromUrl();
   }, []);
 
   const fetchAgencies = async () => {
@@ -66,7 +74,7 @@ export function AgencyManagement() {
 
       const agenciesData = data || [];
 
-      // Count bookings per agency via trips relation (bookings -> trips.agency_id)
+      // Count bookings per agency via trips relation
       const bookingsCountByAgency = await Promise.all(
         agenciesData.map(async (agency) => {
           const { count } = await supabase
@@ -163,7 +171,7 @@ export function AgencyManagement() {
 
       if (authErr) throw authErr;
 
-      // 3. Upsert user in profiles table
+      // 3. Upsert profile
       if (authData.user) {
         await supabase
           .from('profiles')
@@ -233,25 +241,30 @@ export function AgencyManagement() {
 
       toast.success(
         newTrusted 
-          ? "Agence mise en avant ⭐ (Section 'Agences de Confiance' de l'application mobile)" 
-          : "Agence retirée des mises en avant"
+          ? "Agence mise en avant ⭐ (Affichée sur l'accueil mobile dans Agences de Confiance)" 
+          : "Agence retirée de la mise en avant"
       );
     } catch (error) {
-      toast.error("Erreur lors de la mise à jour du statut 'Mise en avant'");
+      toast.error("Erreur lors du changement de statut");
     }
   };
 
-  const filteredAgencies = agencies.filter(a => 
-    a.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredAgencies = agencies.filter(a => {
+    const matchesSearch = a.name.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    if (activeTab === 'featured') return a.is_trusted;
+    if (activeTab === 'active') return a.status === 'active';
+    if (activeTab === 'suspended') return a.status === 'suspended';
+    return true;
+  });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-12">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[32px] font-semibold text-[#1D1D1F] tracking-tight">Gestion des Partenaires</h1>
-          <p className="text-[15px] text-[#86868B] mt-1">Gérez les agences partenaires et leur mise en avant sur l'application mobile</p>
+          <h1 className="text-[32px] font-semibold text-[#1D1D1F] tracking-tight">Gestion des Agences & Mise en Avant</h1>
+          <p className="text-[15px] text-[#86868B] mt-1">Gérez les partenaires et définissez les agences qui apparaissent dans "Agences de Confiance" sur mobile.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
@@ -264,54 +277,132 @@ export function AgencyManagement() {
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-black/5 bg-[#F5F5F7]/50">
-          <CardContent className="p-6">
-            <p className="text-[13px] font-medium text-[#86868B]">Total Agences</p>
-            <h3 className="text-[28px] font-bold text-[#1D1D1F] mt-1">{agencies.length}</h3>
+        <Card onClick={() => setActiveTab('all')} className="border-black/5 bg-white shadow-sm cursor-pointer hover:border-black/20 transition-all">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div>
+              <p className="text-[13px] font-medium text-[#86868B]">Total Agences</p>
+              <h3 className="text-[28px] font-bold text-[#1D1D1F] mt-1">{agencies.length}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-black/5 flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-[#1D1D1F]" />
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="border-black/5 bg-[#F5F5F7]/50">
-          <CardContent className="p-6">
-            <p className="text-[13px] font-medium text-[#86868B]">Actives</p>
-            <h3 className="text-[28px] font-bold text-[#34C759] mt-1">{agencies.filter(a => a.status === 'active').length}</h3>
+        <Card onClick={() => setActiveTab('featured')} className="border-amber-300 bg-amber-50/40 shadow-sm cursor-pointer hover:border-amber-400 transition-all">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div>
+              <p className="text-[13px] font-medium text-amber-800">Mises en Avant (Accueil Mobile)</p>
+              <h3 className="text-[28px] font-bold text-amber-700 mt-1">{agencies.filter(a => a.is_trusted).length}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+              <Star className="w-5 h-5 text-amber-600 fill-amber-500" />
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="border-black/5 bg-[#F5F5F7]/50">
-          <CardContent className="p-6">
-            <p className="text-[13px] font-medium text-[#86868B]">Mises en avant (Confiance)</p>
-            <h3 className="text-[28px] font-bold text-[#D97706] mt-1">{agencies.filter(a => a.is_trusted).length}</h3>
+        <Card onClick={() => setActiveTab('active')} className="border-black/5 bg-white shadow-sm cursor-pointer hover:border-black/20 transition-all">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div>
+              <p className="text-[13px] font-medium text-[#86868B]">Actives</p>
+              <h3 className="text-[28px] font-bold text-[#34C759] mt-1">{agencies.filter(a => a.status === 'active').length}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-[#34C759]/10 flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5 text-[#34C759]" />
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="border-black/5 bg-[#F5F5F7]/50">
-          <CardContent className="p-6">
-            <p className="text-[13px] font-medium text-[#86868B]">Suspendues</p>
-            <h3 className="text-[28px] font-bold text-[#FF3B30] mt-1">{agencies.filter(a => a.status === 'suspended').length}</h3>
+        <Card onClick={() => setActiveTab('suspended')} className="border-black/5 bg-white shadow-sm cursor-pointer hover:border-black/20 transition-all">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div>
+              <p className="text-[13px] font-medium text-[#86868B]">Suspendues</p>
+              <h3 className="text-[28px] font-bold text-[#FF3B30] mt-1">{agencies.filter(a => a.status === 'suspended').length}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-[#FF3B30]/10 flex items-center justify-center">
+              <ShieldAlert className="w-5 h-5 text-[#FF3B30]" />
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters & Search */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-[#86868B]" />
+      {/* Tabs Filter Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-black/10 pb-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all ${
+              activeTab === 'all'
+                ? 'bg-[#1D1D1F] text-white shadow-sm'
+                : 'bg-white border border-black/10 text-[#86868B] hover:bg-black/5'
+            }`}
+          >
+            Toutes les agences ({agencies.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('featured')}
+            className={`px-4 py-2 rounded-xl text-[13px] font-bold flex items-center gap-2 transition-all ${
+              activeTab === 'featured'
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100'
+            }`}
+          >
+            <Star className={`w-4 h-4 ${activeTab === 'featured' ? 'fill-white text-white' : 'fill-amber-600 text-amber-600'}`} />
+            <span>Mises en Avant (Agences de Confiance) ⭐ ({agencies.filter(a => a.is_trusted).length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('active')}
+            className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all ${
+              activeTab === 'active'
+                ? 'bg-[#34C759] text-white shadow-sm'
+                : 'bg-white border border-black/10 text-[#86868B] hover:bg-black/5'
+            }`}
+          >
+            Actives ({agencies.filter(a => a.status === 'active').length})
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
           <input 
             type="text"
-            placeholder="Rechercher une agence..."
+            placeholder="Chercher agence..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-11 pl-11 pr-4 bg-white border border-black/10 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 transition-all"
+            className="w-full h-9 pl-9 pr-3 bg-white border border-black/10 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 transition-all"
           />
         </div>
       </div>
+
+      {/* Banner d'information */}
+      {activeTab === 'featured' && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+            <Star className="w-5 h-5 text-amber-600 fill-amber-500" />
+          </div>
+          <div className="text-[13px] text-amber-900">
+            <p className="font-bold text-[14px]">Agences Mises en Avant (Agences de Confiance sur Mobile) ⭐</p>
+            <p className="mt-0.5">
+              Les agences avec la marque ⭐ apparaissent directement en haut sur l'écran d'accueil de l'application mobile KonGO. Cliquez sur <strong>"Mettre en avant"</strong> pour ajouter ou retirer une agence.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {isLoading ? (
           <div className="col-span-full flex justify-center py-20">
             <Loader2 className="w-10 h-10 animate-spin text-[#007AFF]" />
+          </div>
+        ) : filteredAgencies.length === 0 ? (
+          <div className="col-span-full py-16 text-center text-[#86868B] bg-white rounded-2xl border border-black/5">
+            <Building2 className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            <p className="font-bold text-[16px] text-[#1D1D1F]">Aucune agence trouvée</p>
+            <p className="text-[13px] mt-1">Aucune agence ne correspond aux filtres actuels.</p>
           </div>
         ) : filteredAgencies.map((agency) => (
           <motion.div
@@ -338,7 +429,7 @@ export function AgencyManagement() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {/* Bouton de mise en avant ⭐ */}
+                      {/* Bouton Mise en Avant ⭐ */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -349,7 +440,7 @@ export function AgencyManagement() {
                             ? "bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200"
                             : "bg-black/5 text-[#86868B] hover:bg-black/10 hover:text-[#1D1D1F]"
                         }`}
-                        title="Afficher/masquer dans la section Agences de Confiance de l'accueil mobile"
+                        title="Afficher/masquer dans les Agences de Confiance sur mobile"
                       >
                         <Star className={`w-3.5 h-3.5 ${agency.is_trusted ? "fill-amber-600 text-amber-600" : ""}`} />
                         <span>{agency.is_trusted ? "Mise en avant ⭐" : "Mettre en avant"}</span>
@@ -448,7 +539,7 @@ export function AgencyManagement() {
                   <div className="p-4 rounded-2xl bg-[#F5F5F7] space-y-1">
                     <p className="text-[12px] text-[#86868B] font-medium uppercase">Mise en avant (Accueil)</p>
                     <p className={`text-[15px] font-bold ${selectedAgency.is_trusted ? 'text-[#D97706]' : 'text-[#86868B]'}`}>
-                      {selectedAgency.is_trusted ? '⭐ Oui (De Confiance)' : 'Non'}
+                      {selectedAgency.is_trusted ? '⭐ Oui (Agences de Confiance)' : 'Non'}
                     </p>
                   </div>
                 </div>

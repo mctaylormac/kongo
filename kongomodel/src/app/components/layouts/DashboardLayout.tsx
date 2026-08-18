@@ -26,7 +26,8 @@ import {
   Scan,
   MessageSquare,
   Globe,
-  Megaphone
+  Megaphone,
+  Star
 } from "@/lib/icons";
 import { toast } from "sonner";
 import { useAppState } from "../../../hooks/useAppState";
@@ -185,16 +186,14 @@ export function DashboardLayout() {
        return [
          { id: '/', label: 'Global Audit', icon: LayoutDashboard },
          { id: '/agency-management', label: 'Agences Partenaires', icon: Briefcase },
-         { id: '/agencies', label: 'Points de Vente', icon: Building2 },
-         { id: '/buses', label: 'Flotte Totale', icon: Bus },
+         { id: '/agency-management?tab=featured', label: 'Mise en Avant Agences ⭐', icon: Star },
          { id: '/trips', label: 'Planification', icon: Map },
+         { id: '/buses', label: 'Flotte Totale', icon: Bus },
          { id: '/bookings', label: 'Réservations', icon: Ticket },
          { id: '/users', label: 'Utilisateurs', icon: Users },
          { id: '/finance', label: 'Finance Globale', icon: Wallet },
-         { id: '/extra-services', label: 'Services Extras', icon: Zap },
          { id: '/locations-payments', label: 'Pays & Paiements', icon: Globe },
-         { id: '/notifications', label: 'Diffusion Notifications', icon: Megaphone },
-         { id: '/scanner', label: 'Scanner QR', icon: QrCode },
+         { id: '/notifications', label: 'Diffusion Notifications 📣', icon: Megaphone },
          { id: '/chat', label: 'Chat Agences', icon: MessageSquare, badge: chatUnreadCount },
        ];
     } else if (userRole === 'agency') {
