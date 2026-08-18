@@ -154,6 +154,14 @@ export function LocationsPayments() {
   // Search Queries
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Pagination pour l'onglet Villes (10 par page)
+  const [citiesPage, setCitiesPage] = useState(1);
+  const CITIES_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCitiesPage(1);
+  }, [searchQuery, selectedCountryId]);
+
   // Modals state
   const [showCountryModal, setShowCountryModal] = useState(false);
   const [editingCountry, setEditingCountry] = useState<Country | null>(null);
@@ -481,7 +489,7 @@ export function LocationsPayments() {
     }
   };
 
-  // Filtered lists
+  // Filtered lists (Villes triées par ordre alphabétique)
   const filteredCountries = countries.filter(c => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     c.code.toLowerCase().includes(searchQuery.toLowerCase())
@@ -491,7 +499,13 @@ export function LocationsPayments() {
     const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCountry = selectedCountryId === "all" || c.country_id === selectedCountryId;
     return matchesSearch && matchesCountry;
-  });
+  }).sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
+
+  const totalCitiesPages = Math.ceil(filteredCities.length / CITIES_PER_PAGE) || 1;
+  const paginatedCities = filteredCities.slice(
+    (citiesPage - 1) * CITIES_PER_PAGE,
+    citiesPage * CITIES_PER_PAGE
+  );
 
   const filteredPayments = paymentMethods.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -1041,61 +1055,110 @@ export function LocationsPayments() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/5">
-                  {filteredCities.map(city => {
-                    const country = countries.find(c => c.id === city.country_id);
+                  {paginatedCities.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-8 text-center text-[#86868B]">
+                        Aucune ville trouvée.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedCities.map(city => {
+                      const country = countries.find(c => c.id === city.country_id);
 
-                    return (
-                      <tr key={city.id} className="hover:bg-black/5 transition-all">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-[#86868B]" />
-                            <span className="text-[15px] font-bold text-[#1D1D1F]">{city.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[18px]">{country?.flag_emoji || "🌐"}</span>
-                            <span className="text-[14px] text-[#1D1D1F] font-medium">{country?.name || "N/A"}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <button
-                            onClick={() => toggleCityStatus(city.id, city.is_active)}
-                            className={`px-3 py-1 rounded-full text-[12px] font-semibold transition-all ${
-                              city.is_active
-                                ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-                                : "bg-red-100 text-red-800 hover:bg-red-200"
-                            }`}
-                          >
-                            {city.is_active ? "Actif" : "Inactif"}
-                          </button>
-                        </td>
-                        <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => {
-                              setEditingCity(city);
-                              setCityFormData({ country_id: city.country_id, name: city.name });
-                              setShowCityModal(true);
-                            }}
-                            className="p-2 hover:bg-black/5 rounded-lg text-[#86868B] hover:text-[#1D1D1F]"
-                            title="Modifier"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteCity(city.id, city.name)}
-                            className="p-2 hover:bg-red-50 rounded-lg text-red-500 hover:text-red-700"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                      return (
+                        <tr key={city.id} className="hover:bg-black/5 transition-all">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4 text-[#86868B]" />
+                              <span className="text-[15px] font-bold text-[#1D1D1F]">{city.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[18px]">{country?.flag_emoji || "🌐"}</span>
+                              <span className="text-[14px] text-[#1D1D1F] font-medium">{country?.name || "N/A"}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <button
+                              onClick={() => toggleCityStatus(city.id, city.is_active)}
+                              className={`px-3 py-1 rounded-full text-[12px] font-semibold transition-all ${
+                                city.is_active
+                                  ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                                  : "bg-red-100 text-red-800 hover:bg-red-200"
+                              }`}
+                            >
+                              {city.is_active ? "Actif" : "Inactif"}
+                            </button>
+                          </td>
+                          <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => {
+                                setEditingCity(city);
+                                setCityFormData({ country_id: city.country_id, name: city.name });
+                                setShowCityModal(true);
+                              }}
+                              className="p-2 hover:bg-black/5 rounded-lg text-[#86868B] hover:text-[#1D1D1F]"
+                              title="Modifier"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCity(city.id, city.name)}
+                              className="p-2 hover:bg-red-50 rounded-lg text-red-500 hover:text-red-700"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Réglette de pagination (10 villes par page) */}
+            {filteredCities.length > 0 && (
+              <div className="px-6 py-4 border-t border-black/5 bg-[#F5F5F7]/60 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-[13px] text-[#86868B]">
+                  Affichage de <span className="font-semibold text-[#1D1D1F]">{((citiesPage - 1) * CITIES_PER_PAGE) + 1}</span> à <span className="font-semibold text-[#1D1D1F]">{Math.min(citiesPage * CITIES_PER_PAGE, filteredCities.length)}</span> sur <span className="font-semibold text-[#1D1D1F]">{filteredCities.length}</span> villes (Trie A ➔ Z)
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    onClick={() => setCitiesPage(p => Math.max(p - 1, 1))}
+                    disabled={citiesPage === 1}
+                    className="px-3 py-1.5 rounded-lg border border-black/10 bg-white text-[13px] font-semibold text-[#1D1D1F] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-black/5 transition-all"
+                  >
+                    Précédent
+                  </button>
+
+                  {Array.from({ length: totalCitiesPages }, (_, idx) => idx + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCitiesPage(page)}
+                      className={`w-8 h-8 rounded-lg text-[13px] font-bold transition-all ${
+                        citiesPage === page
+                          ? "bg-[#1D1D1F] text-white shadow-sm"
+                          : "bg-white border border-black/10 text-[#1D1D1F] hover:bg-black/5"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+
+                  <button
+                    onClick={() => setCitiesPage(p => Math.min(p + 1, totalCitiesPages))}
+                    disabled={citiesPage === totalCitiesPages}
+                    className="px-3 py-1.5 rounded-lg border border-black/10 bg-white text-[13px] font-semibold text-[#1D1D1F] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-black/5 transition-all"
+                  >
+                    Suivant
+                  </button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
