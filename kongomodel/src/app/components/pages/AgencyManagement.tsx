@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { 
   Building2, Plus, Search, Filter, MoreHorizontal, 
   ShieldCheck, ShieldAlert, Bus, Map as MapIcon, Ticket, 
-  ChevronRight, X, Loader2, Mail, Lock, User, ImagePlus, Upload
+  ChevronRight, X, Loader2, Mail, Lock, User, ImagePlus, Upload, Star
 } from "../../../lib/icons";
 import { Card, CardContent } from "../ui/Card";
 import { supabase } from "../../../lib/supabase";
@@ -119,37 +119,79 @@ export function AgencyManagement() {
     setIsSubmitting(true);
 
     try {
-      let logo_url: string | null = null;
-
-      // Upload du logo si sélectionné
+      let uploadedLogoUrl: string | null = null;
       if (logoFile) {
-        const ext = logoFile.name.split('.').pop();
-        const path = `agency-logos/${Date.now()}.${ext}`;
-        const { error: uploadError } = await supabase.storage
-          .from('agency-assets')
-          .upload(path, logoFile, { upsert: true, contentType: logoFile.type });
-
-        if (uploadError) throw new Error(`Upload logo : ${uploadError.message}`);
-
-        const { data: urlData } = supabase.storage.from('agency-assets').getPublicUrl(path);
-        logo_url = urlData.publicUrl;
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `agencies/logo_${Date.now()}.${fileExt}`;
+        const { error: uploadErr } = await supabase.storage.from('app-assets').upload(fileName, logoFile);
+        if (uploadErr) {
+          console.warn("Storage error, using fallback URL:", uploadErr);
+        } else {
+          const { data: publicData } = supabase.storage.from('app-assets').getPublicUrl(fileName);
+          uploadedLogoUrl = publicData.publicUrl;
+        }
       }
 
-      const { data, error } = await supabase.functions.invoke('create-agency-admin', {
-        body: { ...formData, logo_url }
+      // 1. Create agency
+      const { data: newAgency, error: agencyErr } = await supabase
+        .from('agencies')
+        .insert([{
+          name: formData.name,
+          commission_rate: formData.commission_rate,
+          description: formData.description || null,
+          logo_url: uploadedLogoUrl,
+          status: 'active',
+          is_trusted: true
+        }])
+        .select()
+        .single();
+
+      if (agencyErr) throw agencyErr;
+
+      // 2. Create Auth User
+      const { data: authData, error: authErr } = await supabase.auth.signUp({
+        email: formData.admin_email,
+        password: formData.admin_password,
+        options: {
+          data: {
+            full_name: formData.admin_name,
+            role: 'agency',
+            agency_id: newAgency.id
+          }
+        }
       });
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      
-      toast.success("Agence et compte administrateur créés avec succès");
+      if (authErr) throw authErr;
+
+      // 3. Upsert user in profiles table
+      if (authData.user) {
+        await supabase
+          .from('profiles')
+          .upsert({
+            id: authData.user.id,
+            email: formData.admin_email,
+            full_name: formData.admin_name,
+            role: 'agency',
+            agency_id: newAgency.id
+          });
+      }
+
+      toast.success("Agence et compte administrateur créés avec succès !");
       setIsModalOpen(false);
-      setFormData({ name: "", commission_rate: 5, description: "", admin_email: "", admin_password: "", admin_name: "" });
+      setFormData({
+        name: "",
+        commission_rate: 5,
+        description: "",
+        admin_email: "",
+        admin_password: "",
+        admin_name: ""
+      });
       setLogoFile(null);
       setLogoPreview(null);
       fetchAgencies();
-    } catch (error: any) {
-      toast.error(error.message || "Erreur lors de la création");
+    } catch (err: any) {
+      console.error("Creation error:", err);
+      toast.error(err.message || "Erreur lors de la création de l'agence");
     } finally {
       setIsSubmitting(false);
     }
@@ -174,6 +216,31 @@ export function AgencyManagement() {
     }
   };
 
+  const toggleTrustedStatus = async (id: string, currentTrusted: boolean) => {
+    const newTrusted = !currentTrusted;
+    try {
+      const { error } = await supabase
+        .from('agencies')
+        .update({ is_trusted: newTrusted })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setAgencies(prev => prev.map(a => a.id === id ? { ...a, is_trusted: newTrusted } : a));
+      if (selectedAgency?.id === id) {
+        setSelectedAgency(prev => prev ? { ...prev, is_trusted: newTrusted } : null);
+      }
+
+      toast.success(
+        newTrusted 
+          ? "Agence mise en avant ⭐ (Section 'Agences de Confiance' de l'application mobile)" 
+          : "Agence retirée des mises en avant"
+      );
+    } catch (error) {
+      toast.error("Erreur lors de la mise à jour du statut 'Mise en avant'");
+    }
+  };
+
   const filteredAgencies = agencies.filter(a => 
     a.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -184,7 +251,7 @@ export function AgencyManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[32px] font-semibold text-[#1D1D1F] tracking-tight">Gestion des Partenaires</h1>
-          <p className="text-[15px] text-[#86868B] mt-1">Gérez les entreprises de transport et leurs comptes administrateurs</p>
+          <p className="text-[15px] text-[#86868B] mt-1">Gérez les agences partenaires et leur mise en avant sur l'application mobile</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
@@ -196,22 +263,31 @@ export function AgencyManagement() {
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-black/5 bg-[#F5F5F7]/50">
           <CardContent className="p-6">
             <p className="text-[13px] font-medium text-[#86868B]">Total Agences</p>
             <h3 className="text-[28px] font-bold text-[#1D1D1F] mt-1">{agencies.length}</h3>
           </CardContent>
         </Card>
+
         <Card className="border-black/5 bg-[#F5F5F7]/50">
           <CardContent className="p-6">
             <p className="text-[13px] font-medium text-[#86868B]">Actives</p>
             <h3 className="text-[28px] font-bold text-[#34C759] mt-1">{agencies.filter(a => a.status === 'active').length}</h3>
           </CardContent>
         </Card>
+
         <Card className="border-black/5 bg-[#F5F5F7]/50">
           <CardContent className="p-6">
-            <p className="text-[13px] font-medium text-[#86868B]">Suspendeues</p>
+            <p className="text-[13px] font-medium text-[#86868B]">Mises en avant (Confiance)</p>
+            <h3 className="text-[28px] font-bold text-[#D97706] mt-1">{agencies.filter(a => a.is_trusted).length}</h3>
+          </CardContent>
+        </Card>
+
+        <Card className="border-black/5 bg-[#F5F5F7]/50">
+          <CardContent className="p-6">
+            <p className="text-[13px] font-medium text-[#86868B]">Suspendues</p>
             <h3 className="text-[28px] font-bold text-[#FF3B30] mt-1">{agencies.filter(a => a.status === 'suspended').length}</h3>
           </CardContent>
         </Card>
@@ -238,33 +314,63 @@ export function AgencyManagement() {
             <Loader2 className="w-10 h-10 animate-spin text-[#007AFF]" />
           </div>
         ) : filteredAgencies.map((agency) => (
-          <motion.div 
-            layoutId={agency.id}
+          <motion.div
             key={agency.id}
-            onClick={() => setSelectedAgency(agency)}
+            layout
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
           >
-            <Card className={`group cursor-pointer hover:shadow-xl transition-all duration-300 border-black/5 overflow-hidden ${agency.status === 'suspended' ? 'opacity-75 grayscale' : ''}`}>
-              <CardContent className="p-0">
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
+            <Card 
+              onClick={() => setSelectedAgency(agency)}
+              className={`border-black/5 hover:border-black/15 transition-all cursor-pointer group hover:shadow-lg relative overflow-hidden bg-white ${
+                agency.is_trusted ? 'border-amber-300 ring-2 ring-amber-400/20' : ''
+              }`}
+            >
+              <CardContent className="p-6">
+                <div className="flex flex-col h-full justify-between space-y-4">
+                  <div className="flex items-start justify-between">
                     <div className="w-14 h-14 rounded-2xl bg-[#F5F5F7] flex items-center justify-center text-[24px] font-bold text-[#1D1D1F] border border-black/5 group-hover:scale-105 transition-transform">
                       {agency.logo_url ? (
                         <img src={agency.logo_url} alt={agency.name} className="w-full h-full object-cover rounded-2xl" />
                       ) : agency.name.charAt(0)}
                     </div>
-                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${
-                      agency.status === 'active' ? 'bg-[#34C759]/10 text-[#34C759]' : 
-                      agency.status === 'suspended' ? 'bg-[#FF3B30]/10 text-[#FF3B30]' : 
-                      'bg-[#FF9500]/10 text-[#FF9500]'
-                    }`}>
-                      {agency.status === 'active' ? 'Actif' : agency.status === 'suspended' ? 'Suspendu' : 'En attente'}
-                    </span>
+
+                    <div className="flex items-center gap-2">
+                      {/* Bouton de mise en avant ⭐ */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTrustedStatus(agency.id, agency.is_trusted);
+                        }}
+                        className={`px-3 py-1 rounded-full text-[11px] font-extrabold flex items-center gap-1.5 transition-all ${
+                          agency.is_trusted
+                            ? "bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200"
+                            : "bg-black/5 text-[#86868B] hover:bg-black/10 hover:text-[#1D1D1F]"
+                        }`}
+                        title="Afficher/masquer dans la section Agences de Confiance de l'accueil mobile"
+                      >
+                        <Star className={`w-3.5 h-3.5 ${agency.is_trusted ? "fill-amber-600 text-amber-600" : ""}`} />
+                        <span>{agency.is_trusted ? "Mise en avant ⭐" : "Mettre en avant"}</span>
+                      </button>
+
+                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${
+                        agency.status === 'active' ? 'bg-[#34C759]/10 text-[#34C759]' : 
+                        agency.status === 'suspended' ? 'bg-[#FF3B30]/10 text-[#FF3B30]' : 
+                        'bg-[#FF9500]/10 text-[#FF9500]'
+                      }`}>
+                        {agency.status === 'active' ? 'Actif' : agency.status === 'suspended' ? 'Suspendu' : 'En attente'}
+                      </span>
+                    </div>
                   </div>
                   
-                  <h3 className="text-[19px] font-bold text-[#1D1D1F] mb-1 group-hover:text-[#007AFF] transition-colors">{agency.name}</h3>
-                  <div className="flex items-center gap-1.5 text-[13px] text-[#86868B] mb-4">
-                    <ShieldCheck className="w-4 h-4 text-[#34C759]" />
-                    <span>Commission : {agency.commission_rate}%</span>
+                  <div>
+                    <h3 className="text-[19px] font-bold text-[#1D1D1F] mb-1 group-hover:text-[#007AFF] transition-colors">{agency.name}</h3>
+                    <div className="flex items-center gap-1.5 text-[13px] text-[#86868B] mb-4">
+                      <ShieldCheck className="w-4 h-4 text-[#34C759]" />
+                      <span>Commission : {agency.commission_rate}%</span>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 pt-4 border-t border-black/5">
@@ -340,8 +446,10 @@ export function AgencyManagement() {
                     </p>
                   </div>
                   <div className="p-4 rounded-2xl bg-[#F5F5F7] space-y-1">
-                    <p className="text-[12px] text-[#86868B] font-medium uppercase">Commission</p>
-                    <p className="text-[15px] font-bold text-[#1D1D1F]">{selectedAgency.commission_rate}% par vente</p>
+                    <p className="text-[12px] text-[#86868B] font-medium uppercase">Mise en avant (Accueil)</p>
+                    <p className={`text-[15px] font-bold ${selectedAgency.is_trusted ? 'text-[#D97706]' : 'text-[#86868B]'}`}>
+                      {selectedAgency.is_trusted ? '⭐ Oui (De Confiance)' : 'Non'}
+                    </p>
                   </div>
                 </div>
 
@@ -380,6 +488,20 @@ export function AgencyManagement() {
               </div>
 
               <div className="p-6 border-t border-black/5 bg-[#F5F5F7]/30 space-y-3">
+                {/* Bouton Mise en avant */}
+                <button 
+                  onClick={() => toggleTrustedStatus(selectedAgency.id, selectedAgency.is_trusted)}
+                  className={`w-full h-12 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all ${
+                    selectedAgency.is_trusted 
+                    ? 'bg-amber-100 border border-amber-300 text-amber-800 hover:bg-amber-200' 
+                    : 'bg-[#1D1D1F] text-white hover:bg-black'
+                  }`}
+                >
+                  <Star className={`w-5 h-5 ${selectedAgency.is_trusted ? 'fill-amber-600 text-amber-600' : 'text-[#C8E63C]'}`} />
+                  <span>{selectedAgency.is_trusted ? "Retirer de la mise en avant (Accueil Mobile)" : "Mettre en avant dans 'Agences de Confiance' ⭐"}</span>
+                </button>
+
+                {/* Bouton Suspendre / Réactiver */}
                 <button 
                   onClick={() => toggleStatus(selectedAgency.id, selectedAgency.status)}
                   className={`w-full h-12 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all ${
