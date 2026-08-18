@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   },
   kintuHeaderRow: {
     flexDirection: 'row',
-    justify.content: 'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 14,
   },
