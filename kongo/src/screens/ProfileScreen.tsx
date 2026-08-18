@@ -547,6 +547,7 @@ export default function ProfileScreen({ navigation }: any) {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
         </View>
       </Modal>
 
