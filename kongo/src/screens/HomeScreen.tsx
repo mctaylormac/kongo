@@ -68,8 +68,17 @@ const KINTU_SLIDES = [
   },
 ];
 
+// ─── Fallback routes si la base est vide ───
+const FALLBACK_ROUTES = [
+  { origin_name: 'Kinshasa', destination_name: 'Lubumbashi', min_price: 150000, duration: '30h', booking_count: 0 },
+  { origin_name: 'Kinshasa', destination_name: 'Mbuji-Mayi', min_price: 80000, duration: '18h', booking_count: 0 },
+  { origin_name: 'Goma',     destination_name: 'Bukavu',     min_price: 25000,  duration: '3h',  booking_count: 0 },
+];
+
 export default function HomeScreen({ navigation }: any) {
   const [agencies, setAgencies] = React.useState<any[]>([]);
+  const [popularRoutes, setPopularRoutes] = useState<any[]>([]);
+  const [routesLoading, setRoutesLoading] = useState(true);
   const [activeSlide, setActiveSlide] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideInterval = useRef<any>(null);
@@ -147,11 +156,29 @@ export default function HomeScreen({ navigation }: any) {
     fetchAgencies();
   }, []);
 
-  const POPULAR_ROUTES = [
-    { from: 'Kinshasa', to: 'Lubumbashi', price: '150.000 CDF', duration: '30h' },
-    { from: 'Kinshasa', to: 'Mbuji-Mayi', price: '80.000 CDF', duration: '18h' },
-    { from: 'Goma', to: 'Bukavu', price: '25.000 CDF', duration: '3h' },
-  ];
+  // ─── Trajets populaires dynamiques ───
+  React.useEffect(() => {
+    async function fetchPopularRoutes() {
+      setRoutesLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('popular_routes')
+          .select('origin_name, destination_name, booking_count, min_price, duration')
+          .limit(5);
+
+        if (!error && data && data.length > 0) {
+          setPopularRoutes(data);
+        } else {
+          setPopularRoutes(FALLBACK_ROUTES);
+        }
+      } catch {
+        setPopularRoutes(FALLBACK_ROUTES);
+      } finally {
+        setRoutesLoading(false);
+      }
+    }
+    fetchPopularRoutes();
+  }, []);
 
   const currentSlide = KINTU_SLIDES[activeSlide];
 
@@ -207,26 +234,53 @@ export default function HomeScreen({ navigation }: any) {
 
         {/* Trajets populaires */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Trajets Populaires</Text>
+          <View style={[styles.sectionHeaderRow, { marginBottom: 14 }]}>
+            <Text style={styles.sectionTitle}>Trajets Populaires 🔥</Text>
+            <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600' }}>Temps réel</Text>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 24 }}>
-            {POPULAR_ROUTES.map((route, idx) => (
-              <TouchableOpacity
-                key={idx}
-                style={styles.routeCard}
-                onPress={() => navigation.navigate('Search')}
-                activeOpacity={0.8}
-              >
-                <View style={styles.routeCardHeader}>
-                  <Text style={styles.routeFrom}>{route.from}</Text>
-                  <ArrowRight size={14} color="#7A960C" style={{ marginHorizontal: 4 }} />
-                  <Text style={styles.routeTo}>{route.to}</Text>
+            {routesLoading ? (
+              // Skeleton placeholders
+              [0, 1, 2].map(i => (
+                <View key={i} style={[styles.routeCard, { opacity: 0.4, backgroundColor: '#F0F0F0' }]}>
+                  <View style={{ height: 16, backgroundColor: '#DDD', borderRadius: 6, marginBottom: 8, width: '80%' }} />
+                  <View style={{ height: 12, backgroundColor: '#DDD', borderRadius: 6, width: '50%' }} />
                 </View>
-                <View style={styles.routeCardFooter}>
-                  <Text style={styles.routePrice}>{route.price}</Text>
-                  <Text style={styles.routeDuration}>{route.duration}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+              ))
+            ) : (
+              popularRoutes.map((route, idx) => {
+                const priceFormatted = route.min_price
+                  ? `${Number(route.min_price).toLocaleString('fr-FR')} CDF`
+                  : '—';
+                const isHot = route.booking_count >= 10;
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={styles.routeCard}
+                    onPress={() => navigation.navigate('Search', { from: route.origin_name, to: route.destination_name })}
+                    activeOpacity={0.8}
+                  >
+                    {isHot && (
+                      <View style={styles.routeHotBadge}>
+                        <Text style={styles.routeHotBadgeText}>🔥 Populaire</Text>
+                      </View>
+                    )}
+                    <View style={styles.routeCardHeader}>
+                      <Text style={styles.routeFrom}>{route.origin_name}</Text>
+                      <ArrowRight size={14} color="#7A960C" style={{ marginHorizontal: 4 }} />
+                      <Text style={styles.routeTo}>{route.destination_name}</Text>
+                    </View>
+                    <View style={styles.routeCardFooter}>
+                      <Text style={styles.routePrice}>{priceFormatted}</Text>
+                      <Text style={styles.routeDuration}>{route.duration || '—'}</Text>
+                    </View>
+                    {route.booking_count > 0 && (
+                      <Text style={styles.routeBookingCount}>{route.booking_count} réservation{route.booking_count > 1 ? 's' : ''}</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </ScrollView>
         </View>
 
@@ -425,15 +479,25 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, color: '#0A0A0A', fontWeight: '900', letterSpacing: 0.3 },
   seeAll: { fontSize: 12, color: '#9EBA15', fontWeight: '800' },
   routeCard: {
-    backgroundColor: '#F9F9F9', borderRadius: 16, padding: 16, width: width * 0.55,
+    backgroundColor: '#F9F9F9', borderRadius: 16, padding: 16, width: width * 0.58,
     borderWidth: 1, borderColor: '#EEE',
   },
+  routeHotBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFF3DC',
+    borderRadius: 8,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    marginBottom: 8,
+  },
+  routeHotBadgeText: { fontSize: 10, fontWeight: '800', color: '#B45309' },
   routeCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   routeFrom: { fontSize: 13, color: '#0A0A0A', fontWeight: '800', flex: 1 },
   routeTo: { fontSize: 13, color: '#9EBA15', fontWeight: '800', flex: 1, textAlign: 'right' },
   routeCardFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
   routePrice: { fontSize: 15, color: '#0A0A0A', fontWeight: '900' },
   routeDuration: { fontSize: 11, color: '#888', fontWeight: '600' },
+  routeBookingCount: { fontSize: 10, color: '#9EBA15', fontWeight: '700', marginTop: 6 },
   agencyRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, marginRight: 24, marginBottom: 10,
