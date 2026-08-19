@@ -16,6 +16,8 @@ interface Agency {
   status: 'active' | 'suspended' | 'pending';
   commission_rate: number;
   description: string | null;
+  country?: string | null;
+  country_code?: string | null;
   is_trusted: boolean;
   created_at: string;
   _count?: {
@@ -39,6 +41,8 @@ export function AgencyManagement() {
     name: "",
     commission_rate: 5,
     description: "",
+    country: "République Démocratique du Congo",
+    country_code: "RDC",
     admin_email: "",
     admin_password: "",
     admin_name: ""
@@ -147,6 +151,8 @@ export function AgencyManagement() {
           name: formData.name,
           commission_rate: formData.commission_rate,
           description: formData.description || null,
+          country: formData.country,
+          country_code: formData.country_code,
           logo_url: uploadedLogoUrl,
           status: 'active',
           is_trusted: true
@@ -190,6 +196,8 @@ export function AgencyManagement() {
         name: "",
         commission_rate: 5,
         description: "",
+        country: "République Démocratique du Congo",
+        country_code: "RDC",
         admin_email: "",
         admin_password: "",
         admin_name: ""
@@ -457,7 +465,12 @@ export function AgencyManagement() {
                   </div>
                   
                   <div>
-                    <h3 className="text-[19px] font-bold text-[#1D1D1F] mb-1 group-hover:text-[#007AFF] transition-colors">{agency.name}</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-[19px] font-bold text-[#1D1D1F] group-hover:text-[#007AFF] transition-colors">{agency.name}</h3>
+                      <span className="text-[11px] font-extrabold bg-[#F5F5F7] px-2 py-0.5 rounded-md border border-black/5 text-[#555]">
+                        🌐 {agency.country_code || 'RDC'}
+                      </span>
+                    </div>
                     <div className="flex items-center gap-1.5 text-[13px] text-[#86868B] mb-4">
                       <ShieldCheck className="w-4 h-4 text-[#34C759]" />
                       <span>Commission : {agency.commission_rate}%</span>
@@ -701,6 +714,34 @@ export function AgencyManagement() {
                         className="w-full h-12 px-4 bg-[#F5F5F7] border-0 rounded-2xl focus:ring-2 focus:ring-[#007AFF]/20 transition-all text-[15px]"
                       />
                     </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[13px] font-semibold text-[#1D1D1F] ml-1">Pays d'opération</label>
+                    <select
+                      value={formData.country_code}
+                      onChange={e => {
+                        const code = e.target.value;
+                        const countryNames: Record<string, string> = {
+                          RDC: "République Démocratique du Congo",
+                          CG: "République du Congo",
+                          CM: "Cameroun",
+                          CI: "Côte d'Ivoire",
+                          GA: "Gabon"
+                        };
+                        setFormData({
+                          ...formData,
+                          country_code: code,
+                          country: countryNames[code] || "République Démocratique du Congo"
+                        });
+                      }}
+                      className="w-full h-12 px-4 bg-[#F5F5F7] border-0 rounded-2xl focus:ring-2 focus:ring-[#007AFF]/20 transition-all text-[15px] font-medium"
+                    >
+                      <option value="RDC">🇨🇩 République Démocratique du Congo (RDC)</option>
+                      <option value="CG">🇨🇬 République du Congo (Brazzaville)</option>
+                      <option value="CM">🇨🇲 Cameroun (CM)</option>
+                      <option value="CI">🇨🇮 Côte d'Ivoire (CI)</option>
+                      <option value="GA">🇬🇦 Gabon (GA)</option>
+                    </select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[13px] font-semibold text-[#1D1D1F] ml-1">Description (Optionnel)</label>

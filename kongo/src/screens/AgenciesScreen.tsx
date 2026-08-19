@@ -97,13 +97,30 @@ export default function AgenciesScreen({ navigation }: any) {
     const fetchAgencies = async () => {
       setLoading(true);
       try {
-        let queryDB = supabase.from('agencies').select('*');
-        if (selectedCountry?.name) {
-          // Filtrer si colonne country disponible ou garder toutes si colonne nulle
-          queryDB = queryDB.or(`country.eq.${selectedCountry.name},country.is.null,country.eq.${selectedCountry.code}`);
+        const { data, error } = await supabase
+          .from('agencies')
+          .select('*')
+          .order('name');
+
+        if (!error && data) {
+          const filteredByCountry = data.filter((a: any) => {
+            // Si l'agence n'a pas de pays renseigné, elle est considérée comme universelle
+            if (!a.country && !a.country_code) return true;
+            
+            const matchName = a.country && (
+              a.country.toLowerCase() === selectedCountry.name.toLowerCase() ||
+              a.country.toLowerCase() === selectedCountry.code.toLowerCase()
+            );
+            const matchCode = a.country_code && (
+              a.country_code.toLowerCase() === selectedCountry.code.toLowerCase() ||
+              a.country_code.toLowerCase() === selectedCountry.name.toLowerCase()
+            );
+            return matchName || matchCode;
+          });
+          setAgencies(filteredByCountry);
+        } else {
+          console.warn('Erreur chargement agences Supabase:', error);
         }
-        const { data, error } = await queryDB.order('name');
-        if (!error && data) setAgencies(data);
       } catch (err) {
         console.error('Erreur chargement agences:', err);
       } finally {

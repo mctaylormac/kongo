@@ -26,6 +26,7 @@ import {
   Compass 
 } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
+import { useCountry } from '../context/CountryContext';
 
 const { width } = Dimensions.get('window');
 
@@ -135,26 +136,35 @@ export default function HomeScreen({ navigation }: any) {
     }, 3000);
   }, [fadeAnim]);
 
+  const { selectedCountry } = useCountry();
+
   React.useEffect(() => {
     async function fetchAgencies() {
       const { data: trusted } = await supabase
         .from('agencies')
-        .select('id, name, logo_url, rating')
+        .select('id, name, logo_url, rating, country, country_code')
         .eq('is_trusted', true)
-        .limit(5);
+        .limit(10);
 
-      if (trusted && trusted.length > 0) {
-        setAgencies(trusted);
-      } else {
-        const { data: all } = await supabase
-          .from('agencies')
-          .select('id, name, logo_url, rating')
-          .limit(5);
-        if (all) setAgencies(all);
-      }
+      const sourceList = (trusted && trusted.length > 0) ? trusted : (await supabase.from('agencies').select('id, name, logo_url, rating, country, country_code').limit(10)).data || [];
+
+      const filtered = sourceList.filter((a: any) => {
+        if (!a.country && !a.country_code) return true;
+        const matchName = a.country && (
+          a.country.toLowerCase() === selectedCountry.name.toLowerCase() ||
+          a.country.toLowerCase() === selectedCountry.code.toLowerCase()
+        );
+        const matchCode = a.country_code && (
+          a.country_code.toLowerCase() === selectedCountry.code.toLowerCase() ||
+          a.country_code.toLowerCase() === selectedCountry.name.toLowerCase()
+        );
+        return matchName || matchCode;
+      });
+
+      setAgencies(filtered.slice(0, 5));
     }
     fetchAgencies();
-  }, []);
+  }, [selectedCountry]);
 
   // ─── Trajets populaires dynamiques ───
   React.useEffect(() => {
