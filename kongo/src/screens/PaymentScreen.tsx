@@ -10,6 +10,8 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
@@ -174,78 +176,99 @@ export default function PaymentScreen({ route, navigation }: any) {
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={20} color="#0A0A0A" />
-        </TouchableOpacity>
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={styles.headerTitle}>Paiement</Text>
-          <Text style={styles.headerSub}>{from} → {to}</Text>
-        </View>
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 160 }}>
-
-        {/* Amount Card */}
-        <View style={styles.amountCard}>
-          <Text style={styles.amountLabel}>À PAYER</Text>
-          <Text style={styles.amountValue}>{grandTotal?.toLocaleString('fr-CD')} CDF</Text>
-          <View style={styles.amountBadge}>
-            <Text style={styles.amountBadgeText}>{passengers} Passager{passengers > 1 ? 's' : ''}</Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Moyen de paiement</Text>
-        {methods.map(method => {
-          const isActive = selectedMethod === method.id;
-          return (
-            <TouchableOpacity
-              key={method.id}
-              style={[styles.methodCard, isActive && styles.methodCardActive]}
-              onPress={() => setSelectedMethod(method.id)}
-              activeOpacity={0.85}
-            >
-              <View style={[styles.methodIconBox, isActive && styles.methodIconBoxActive]}>
-                {method.icon}
-              </View>
-              <View style={{ flex: 1, marginLeft: 14 }}>
-                <Text style={[styles.methodName, isActive && styles.methodNameActive]}>{method.name}</Text>
-                <Text style={styles.methodDesc}>{method.desc}</Text>
-              </View>
-              <View style={[styles.methodRadio, isActive && styles.methodRadioActive]}>
-                {isActive && <Check size={12} color="#FFFFFF" strokeWidth={4} />}
-              </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={{ flex: 1 }}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+              <ArrowLeft size={20} color="#0A0A0A" />
             </TouchableOpacity>
-          );
-        })}
-
-        {/* Phone Input Card */}
-        {selectedMethod !== 'cash_agency' && (
-          <View style={styles.phoneCard}>
-            <Text style={styles.phoneLabel}>Numéro de téléphone</Text>
-            <View style={styles.phoneInputRow}>
-              <Text style={styles.phonePrefix}>+243</Text>
-              <TextInput
-                style={styles.phoneNumber}
-                placeholder="000 000 000"
-                placeholderTextColor="#AAA"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="numeric"
-                maxLength={10}
-              />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.headerTitle}>Paiement</Text>
+              <Text style={styles.headerSub}>{from} → {to}</Text>
             </View>
-            <Text style={styles.phoneHint}>Une demande de confirmation apparaîtra sur votre téléphone.</Text>
           </View>
-        )}
 
-        {selectedMethod === 'cash_agency' && (
-          <View style={styles.infoCard}>
-            <Text style={styles.infoText}>📍 Veuillez vous rendre à une agence KonGO pour régler le montant et valider votre réservation.</Text>
-          </View>
-        )}
-      </ScrollView>
+          <ScrollView 
+            showsVerticalScrollIndicator={false} 
+            contentContainerStyle={{ padding: 16, paddingBottom: 160 }}
+            keyboardShouldPersistTaps="handled"
+          >
+
+            {/* Amount Card */}
+            <View style={styles.amountCard}>
+              <Text style={styles.amountLabel}>À PAYER</Text>
+              <Text style={styles.amountValue}>{grandTotal?.toLocaleString('fr-CD')} CDF</Text>
+              <View style={styles.amountBadge}>
+                <Text style={styles.amountBadgeText}>{passengers} Passager{passengers > 1 ? 's' : ''}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.sectionTitle}>Moyen de paiement</Text>
+            {methods.map(method => {
+              const isActive = selectedMethod === method.id;
+              return (
+                <TouchableOpacity
+                  key={method.id}
+                  style={[styles.methodCard, isActive && styles.methodCardActive]}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setSelectedMethod(method.id);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={[styles.methodIconBox, isActive && styles.methodIconBoxActive]}>
+                    {method.icon}
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 14 }}>
+                    <Text style={[styles.methodName, isActive && styles.methodNameActive]}>{method.name}</Text>
+                    <Text style={styles.methodDesc}>{method.desc}</Text>
+                  </View>
+                  <View style={[styles.methodRadio, isActive && styles.methodRadioActive]}>
+                    {isActive && <Check size={12} color="#FFFFFF" strokeWidth={4} />}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Phone Input Card */}
+            {selectedMethod !== 'cash_agency' && (
+              <View style={styles.phoneCard}>
+                <Text style={styles.phoneLabel}>Numéro de téléphone</Text>
+                <View style={styles.phoneInputRow}>
+                  <Text style={styles.phonePrefix}>+243</Text>
+                  <TextInput
+                    style={styles.phoneNumber}
+                    placeholder="000 000 000"
+                    placeholderTextColor="#AAA"
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="numeric"
+                    returnKeyType="done"
+                    onSubmitEditing={() => Keyboard.dismiss()}
+                    autoFocus={false}
+                    maxLength={10}
+                  />
+                  <TouchableOpacity 
+                    style={styles.okBtn} 
+                    onPress={() => Keyboard.dismiss()}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.okBtnText}>OK</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.phoneHint}>Une demande de confirmation apparaîtra sur votre téléphone.</Text>
+              </View>
+            )}
+
+            {selectedMethod === 'cash_agency' && (
+              <View style={styles.infoCard}>
+                <Text style={styles.infoText}>📍 Veuillez vous rendre à une agence KonGO pour régler le montant et valider votre réservation.</Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </TouchableWithoutFeedback>
 
       {/* Bottom Bar */}
       <View style={styles.bottomBar}>
@@ -340,6 +363,8 @@ const styles = StyleSheet.create({
   phoneInputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E5EA', paddingHorizontal: 16, paddingVertical: 14 },
   phonePrefix: { fontSize: 16, color: '#0A0A0A', fontWeight: '900', marginRight: 10 },
   phoneNumber: { flex: 1, fontSize: 18, color: '#0A0A0A', fontWeight: '900' },
+  okBtn: { backgroundColor: '#9EBA15', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, marginLeft: 8, alignItems: 'center', justifyContent: 'center' },
+  okBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
   phoneHint: { fontSize: 11, color: '#666', marginTop: 10, fontWeight: '500', textAlign: 'center' },
   infoCard: { backgroundColor: '#F5F5F5', borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: '#E5E5EA', marginTop: 16 },
   infoText: { fontSize: 13, color: '#666', lineHeight: 20, fontWeight: '500' },
