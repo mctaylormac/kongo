@@ -192,26 +192,49 @@ export default function ProfileScreen({ navigation }: any) {
       if (!editCountry) return;
       setLoadingCities(true);
       try {
-        let query = supabase.from('cities').select('name, country_id').eq('is_active', true);
-        if (editCountry.id) {
-          query = query.eq('country_id', editCountry.id);
-        }
-        const { data, error } = await query;
-        if (!error && data && data.length > 0) {
-          setAvailableCities(data.map((c: any) => c.name));
+        // 1. Résoudre l'UUID réel du pays depuis Supabase (le 'id' des DEFAULT_COUNTRIES n'est pas un vrai UUID)
+        let countryUuid: string | null = null;
+
+        // Si editCountry.id ressemble à un vrai UUID (36 chars), on l'utilise directement
+        if (editCountry.id && editCountry.id.length === 36) {
+          countryUuid = editCountry.id;
         } else {
-          // Fallback par pays
-          if (editCountry.code === 'RDC' || editCountry.phone_code === '+243') {
-            setAvailableCities(['Kinshasa', 'Lubumbashi', 'Goma', 'Bukavu', 'Matadi', 'Kisangani', 'Mbuji-Mayi', 'Kananga']);
-          } else if (editCountry.code === 'CG' || editCountry.phone_code === '+242') {
-            setAvailableCities(['Brazzaville', 'Pointe-Noire', 'Dolisie', 'Nkayi', 'Ouesso']);
-          } else if (editCountry.code === 'CM' || editCountry.phone_code === '+237') {
-            setAvailableCities(['Douala', 'Yaoundé', 'Garoua', 'Bamenda', 'Maroua', 'Bafoussam']);
-          } else if (editCountry.code === 'CI' || editCountry.phone_code === '+225') {
-            setAvailableCities(['Abidjan', 'Bouaké', 'Yamoussoukro', 'San-Pédro', 'Korhogo']);
-          } else {
-            setAvailableCities(['Libreville', 'Port-Gentil', 'Franceville']);
+          // Sinon on résout via code ou phone_code
+          const { data: countryRow } = await supabase
+            .from('countries')
+            .select('id')
+            .eq('code', editCountry.code)
+            .single();
+          if (countryRow?.id) countryUuid = countryRow.id;
+        }
+
+        // 2. Charger les villes avec l'UUID résolu
+        if (countryUuid) {
+          const { data, error } = await supabase
+            .from('cities')
+            .select('name')
+            .eq('country_id', countryUuid)
+            .eq('is_active', true)
+            .order('name', { ascending: true });
+
+          if (!error && data && data.length > 0) {
+            setAvailableCities(data.map((c: any) => c.name));
+            setLoadingCities(false);
+            return;
           }
+        }
+
+        // 3. Fallback statique si la base ne retourne rien
+        if (editCountry.code === 'RDC' || editCountry.phone_code === '+243') {
+          setAvailableCities(['Kinshasa', 'Lubumbashi', 'Goma', 'Bukavu', 'Matadi', 'Kisangani', 'Mbuji-Mayi', 'Kananga']);
+        } else if (editCountry.code === 'CG' || editCountry.phone_code === '+242') {
+          setAvailableCities(['Brazzaville', 'Pointe-Noire', 'Dolisie', 'Nkayi', 'Ouesso']);
+        } else if (editCountry.code === 'CM' || editCountry.phone_code === '+237') {
+          setAvailableCities(['Douala', 'Yaoundé', 'Garoua', 'Bamenda', 'Maroua', 'Bafoussam']);
+        } else if (editCountry.code === 'CI' || editCountry.phone_code === '+225') {
+          setAvailableCities(['Abidjan', 'Bouaké', 'Yamoussoukro', 'San-Pédro', 'Korhogo']);
+        } else {
+          setAvailableCities(['Libreville', 'Port-Gentil', 'Franceville']);
         }
       } catch {
         setAvailableCities(['Kinshasa', 'Lubumbashi', 'Goma']);
