@@ -313,6 +313,56 @@ export function AgencyManagement() {
     }
   };
 
+  const handleDeleteAgency = async (agency: Agency) => {
+    if (!confirm(`Supprimer définitivement "${agency.name}" ainsi que tous ses bus, voyages, réservations et données associées ? Cette action est irréversible.`)) return;
+
+    try {
+      // 1. Tenter la suppression via la fonction RPC SQL
+      const { error: rpcErr } = await supabase.rpc('delete_agency_cascade', { p_agency_id: agency.id });
+
+      if (rpcErr) {
+        console.warn("RPC delete_agency_cascade fallback:", rpcErr);
+
+        // 2. Cascade client-side si la fonction RPC n'est pas encore appliquée en base
+        const { data: trips } = await supabase.from('trips').select('id').eq('agency_id', agency.id);
+        const tripIds = (trips || []).map(t => t.id);
+
+        if (tripIds.length > 0) {
+          const { data: bookings } = await supabase.from('bookings').select('id').in('trip_id', tripIds);
+          const bookingIds = (bookings || []).map(b => b.id);
+
+          if (bookingIds.length > 0) {
+            await supabase.from('ticket_scans').delete().in('booking_id', bookingIds);
+            await supabase.from('booking_passengers').delete().in('booking_id', bookingIds);
+            await supabase.from('payments').delete().in('booking_id', bookingIds);
+            await supabase.from('bookings').delete().in('trip_id', tripIds);
+          }
+
+          await supabase.from('trip_reviews').delete().in('trip_id', tripIds);
+          await supabase.from('incidents').delete().in('trip_id', tripIds);
+          await supabase.from('driver_assignments').delete().in('trip_id', tripIds);
+          await supabase.from('trips').delete().eq('agency_id', agency.id);
+        }
+
+        await supabase.from('buses').delete().eq('agency_id', agency.id);
+        await supabase.from('agency_reviews').delete().eq('agency_id', agency.id);
+        await supabase.from('extra_services').delete().eq('agency_id', agency.id);
+        await supabase.from('notifications').delete().eq('agency_id', agency.id);
+        await supabase.from('profiles').update({ agency_id: null }).eq('agency_id', agency.id);
+
+        const { error: finalErr } = await supabase.from('agencies').delete().eq('id', agency.id);
+        if (finalErr) throw finalErr;
+      }
+
+      setAgencies(prev => prev.filter(a => a.id !== agency.id));
+      setSelectedAgency(null);
+      toast.success(`Agence "${agency.name}" et toutes ses données associées ont été supprimées.`);
+    } catch (err: any) {
+      console.error("Delete error:", err);
+      toast.error(err.message || "Erreur lors de la suppression de l'agence");
+    }
+  };
+
   const filteredAgencies = agencies.filter(a => {
     const matchesSearch = a.name.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
@@ -653,26 +703,13 @@ export function AgencyManagement() {
                     Modifier
                   </button>
                   <button
-                    onClick={async () => {
-                      if (!confirm(`Supprimer définitivement "${selectedAgency.name}" ? Cette action est irréversible.`)) return;
-                      try {
-                        const { error } = await supabase.from('agencies').delete().eq('id', selectedAgency.id);
-                        if (error) throw error;
-                        setAgencies(prev => prev.filter(a => a.id !== selectedAgency.id));
-                        setSelectedAgency(null);
-                        toast.success(`Agence "${selectedAgency.name}" supprimée.`);
-                      } catch {
-                        toast.error('Erreur lors de la suppression.');
-                      }
-                    }}
+                    onClick={() => handleDeleteAgency(selectedAgency)}
                     className="h-11 rounded-xl flex items-center justify-center gap-2 text-[13px] font-bold bg-white border border-[#FF3B30] text-[#FF3B30] hover:bg-[#FF3B30] hover:text-white transition-all"
                   >
                     <Trash2 className="w-4 h-4" />
                     Supprimer
                   </button>
                 </div>
-
-                {/* Bouton Suspendre / Réactiver */}
                 <button 
                   onClick={() => toggleStatus(selectedAgency.id, selectedAgency.status)}
                   className={`w-full h-11 rounded-xl flex items-center justify-center gap-2 text-[13px] font-semibold transition-all ${
