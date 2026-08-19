@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { 
   Building2, Plus, Search, Filter, MoreHorizontal, 
   ShieldCheck, ShieldAlert, Bus, Map as MapIcon, Ticket, 
-  ChevronRight, X, Loader2, Mail, Lock, User, ImagePlus, Upload, Star
+  ChevronRight, X, Loader2, Mail, Lock, User, ImagePlus, Upload, Star,
+  Edit2, Trash2
 } from "../../../lib/icons";
 import { Card, CardContent } from "../ui/Card";
 import { supabase } from "../../../lib/supabase";
@@ -581,29 +582,48 @@ export function AgencyManagement() {
               </div>
 
               <div className="p-6 border-t border-black/5 bg-[#F5F5F7]/30 space-y-3">
-                {/* Bouton Mise en avant */}
-                <button 
-                  onClick={() => toggleTrustedStatus(selectedAgency.id, selectedAgency.is_trusted)}
-                  className={`w-full h-12 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all ${
-                    selectedAgency.is_trusted 
-                    ? 'bg-amber-100 border border-amber-300 text-amber-800 hover:bg-amber-200' 
-                    : 'bg-[#1D1D1F] text-white hover:bg-black'
-                  }`}
-                >
-                  <Star className={`w-5 h-5 ${selectedAgency.is_trusted ? 'fill-amber-600 text-amber-600' : 'text-[#C8E63C]'}`} />
-                  <span>{selectedAgency.is_trusted ? "Retirer de la mise en avant (Accueil Mobile)" : "Mettre en avant dans 'Agences de Confiance' ⭐"}</span>
-                </button>
+                {/* Boutons principaux : Modifier + Supprimer */}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => {
+                      setIsModalOpen(true);
+                      // pré-remplir le formulaire avec les données de l'agence sélectionnée
+                    }}
+                    className="h-11 rounded-xl flex items-center justify-center gap-2 text-[13px] font-bold bg-[#007AFF] text-white hover:bg-[#0068D9] transition-all"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Modifier
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`Supprimer définitivement "${selectedAgency.name}" ? Cette action est irréversible.`)) return;
+                      try {
+                        const { error } = await supabase.from('agencies').delete().eq('id', selectedAgency.id);
+                        if (error) throw error;
+                        setAgencies(prev => prev.filter(a => a.id !== selectedAgency.id));
+                        setSelectedAgency(null);
+                        toast.success(`Agence "${selectedAgency.name}" supprimée.`);
+                      } catch {
+                        toast.error('Erreur lors de la suppression.');
+                      }
+                    }}
+                    className="h-11 rounded-xl flex items-center justify-center gap-2 text-[13px] font-bold bg-white border border-[#FF3B30] text-[#FF3B30] hover:bg-[#FF3B30] hover:text-white transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Supprimer
+                  </button>
+                </div>
 
                 {/* Bouton Suspendre / Réactiver */}
                 <button 
                   onClick={() => toggleStatus(selectedAgency.id, selectedAgency.status)}
-                  className={`w-full h-12 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all ${
+                  className={`w-full h-11 rounded-xl flex items-center justify-center gap-2 text-[13px] font-semibold transition-all ${
                     selectedAgency.status === 'active' 
-                    ? 'bg-white border border-[#FF3B30] text-[#FF3B30] hover:bg-[#FF3B30] hover:text-white' 
-                    : 'bg-[#34C759] text-white hover:bg-[#28A745]'
+                    ? 'bg-[#FF9500]/10 border border-[#FF9500]/40 text-[#CC7700] hover:bg-[#FF9500] hover:text-white' 
+                    : 'bg-[#34C759]/10 border border-[#34C759]/40 text-[#1A8A38] hover:bg-[#34C759] hover:text-white'
                   }`}
                 >
-                  {selectedAgency.status === 'active' ? <ShieldAlert className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
+                  {selectedAgency.status === 'active' ? <ShieldAlert className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
                   {selectedAgency.status === 'active' ? "Suspendre l'agence" : "Réactiver l'agence"}
                 </button>
               </div>
