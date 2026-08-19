@@ -35,6 +35,7 @@ export function AgencyManagement() {
   const [selectedAgency, setSelectedAgency] = useState<Agency | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'suspended'>('all');
+  const [editMode, setEditMode] = useState(false);
   
   // Form State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -121,11 +122,29 @@ export function AgencyManagement() {
     setLogoPreview(URL.createObjectURL(file));
   };
 
+  const openEditModal = (agency: Agency) => {
+    setEditMode(true);
+    setFormData({
+      name: agency.name,
+      commission_rate: agency.commission_rate ?? 5,
+      description: agency.description || '',
+      country: agency.country || 'République Démocratique du Congo',
+      country_code: agency.country_code || 'RDC',
+      admin_email: '',
+      admin_password: '',
+      admin_name: ''
+    });
+    setLogoPreview(agency.logo_url || null);
+    setLogoFile(null);
+    setIsModalOpen(true);
+  };
+
   const handleCreateAgency = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
+      // Upload logo si nouveau fichier sélectionné
       let uploadedLogoUrl: string | null = null;
       if (logoFile) {
         const fileExt = logoFile.name.split('.').pop();
@@ -139,70 +158,85 @@ export function AgencyManagement() {
         }
       }
 
-      // 1. Create agency
-      const { data: newAgency, error: agencyErr } = await supabase
-        .from('agencies')
-        .insert([{
+      if (editMode && selectedAgency) {
+        // ── MODE ÉDITION : UPDATE ──
+        const updatePayload: any = {
           name: formData.name,
           commission_rate: formData.commission_rate,
           description: formData.description || null,
           country: formData.country,
           country_code: formData.country_code,
-          logo_url: uploadedLogoUrl,
-          status: 'active',
-          is_trusted: true
-        }])
-        .select()
-        .single();
+        };
+        if (uploadedLogoUrl) updatePayload.logo_url = uploadedLogoUrl;
 
-      if (agencyErr) throw agencyErr;
+        const { error: updateErr } = await supabase
+          .from('agencies')
+          .update(updatePayload)
+          .eq('id', selectedAgency.id);
 
-      // 2. Create Auth User
-      const { data: authData, error: authErr } = await supabase.auth.signUp({
-        email: formData.admin_email,
-        password: formData.admin_password,
-        options: {
-          data: {
-            full_name: formData.admin_name,
-            role: 'agency',
-            agency_id: newAgency.id
+        if (updateErr) throw updateErr;
+
+        // Mettre à jour l'état local immédiatement
+        const updatedAgency = { ...selectedAgency, ...updatePayload };
+        setAgencies(prev => prev.map(a => a.id === selectedAgency.id ? updatedAgency : a));
+        setSelectedAgency(updatedAgency);
+
+        toast.success(`Agence "${formData.name}" modifiée avec succès !`);
+      } else {
+        // ── MODE CRÉATION : INSERT + Auth ──
+        const { data: newAgency, error: agencyErr } = await supabase
+          .from('agencies')
+          .insert([{
+            name: formData.name,
+            commission_rate: formData.commission_rate,
+            description: formData.description || null,
+            country: formData.country,
+            country_code: formData.country_code,
+            logo_url: uploadedLogoUrl,
+            status: 'active',
+            is_trusted: true
+          }])
+          .select()
+          .single();
+
+        if (agencyErr) throw agencyErr;
+
+        const { data: authData, error: authErr } = await supabase.auth.signUp({
+          email: formData.admin_email,
+          password: formData.admin_password,
+          options: {
+            data: {
+              full_name: formData.admin_name,
+              role: 'agency',
+              agency_id: newAgency.id
+            }
           }
-        }
-      });
+        });
 
-      if (authErr) throw authErr;
+        if (authErr) throw authErr;
 
-      // 3. Upsert profile
-      if (authData.user) {
-        await supabase
-          .from('profiles')
-          .upsert({
+        if (authData.user) {
+          await supabase.from('profiles').upsert({
             id: authData.user.id,
             email: formData.admin_email,
             full_name: formData.admin_name,
             role: 'agency',
             agency_id: newAgency.id
           });
+        }
+
+        toast.success("Agence et compte administrateur créés avec succès !");
+        fetchAgencies();
       }
 
-      toast.success("Agence et compte administrateur créés avec succès !");
       setIsModalOpen(false);
-      setFormData({
-        name: "",
-        commission_rate: 5,
-        description: "",
-        country: "République Démocratique du Congo",
-        country_code: "RDC",
-        admin_email: "",
-        admin_password: "",
-        admin_name: ""
-      });
+      setEditMode(false);
+      setFormData({ name: "", commission_rate: 5, description: "", country: "République Démocratique du Congo", country_code: "RDC", admin_email: "", admin_password: "", admin_name: "" });
       setLogoFile(null);
       setLogoPreview(null);
-      fetchAgencies();
     } catch (err: any) {
-      console.error("Creation error:", err);
-      toast.error(err.message || "Erreur lors de la création de l'agence");
+      console.error("Error:", err);
+      toast.error(err.message || "Erreur lors de l'opération");
     } finally {
       setIsSubmitting(false);
     }
@@ -585,10 +619,7 @@ export function AgencyManagement() {
                 {/* Boutons principaux : Modifier + Supprimer */}
                 <div className="grid grid-cols-2 gap-3">
                   <button
-                    onClick={() => {
-                      setIsModalOpen(true);
-                      // pré-remplir le formulaire avec les données de l'agence sélectionnée
-                    }}
+                    onClick={() => openEditModal(selectedAgency)}
                     className="h-11 rounded-xl flex items-center justify-center gap-2 text-[13px] font-bold bg-[#007AFF] text-white hover:bg-[#0068D9] transition-all"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -651,10 +682,14 @@ export function AgencyManagement() {
             >
               <div className="p-8 border-b border-black/5 flex items-center justify-between">
                 <div>
-                  <h2 className="text-[24px] font-bold text-[#1D1D1F]">Ajouter une agence</h2>
-                  <p className="text-[14px] text-[#86868B] mt-1">Créez une entité agence et son compte administrateur</p>
+                  <h2 className="text-[24px] font-bold text-[#1D1D1F]">
+                    {editMode ? `Modifier — ${formData.name}` : 'Ajouter une agence'}
+                  </h2>
+                  <p className="text-[14px] text-[#86868B] mt-1">
+                    {editMode ? 'Mettez à jour les informations de cette agence' : 'Créez une entité agence et son compte administrateur'}
+                  </p>
                 </div>
-                <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-full hover:bg-[#F5F5F7] flex items-center justify-center transition-colors">
+                <button onClick={() => { setIsModalOpen(false); setEditMode(false); }} className="w-10 h-10 rounded-full hover:bg-[#F5F5F7] flex items-center justify-center transition-colors">
                   <X className="w-6 h-6 text-[#86868B]" />
                 </button>
               </div>
@@ -763,63 +798,68 @@ export function AgencyManagement() {
                   </div>
                 </div>
 
-                <div className="space-y-4 pt-6 border-t border-black/5">
-                  <h3 className="text-[14px] font-bold text-[#1D1D1F] uppercase tracking-wider flex items-center gap-2">
-                    <User className="w-4 h-4 text-[#34C759]" />
-                    Compte Administrateur Agence
-                  </h3>
-                  <div className="space-y-1.5">
-                    <label className="text-[13px] font-semibold text-[#1D1D1F] ml-1">Nom complet du Gérant</label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#86868B]" />
-                      <input 
-                        required
-                        value={formData.admin_name}
-                        onChange={e => setFormData({...formData, admin_name: e.target.value})}
-                        className="w-full h-12 pl-12 pr-4 bg-[#F5F5F7] border-0 rounded-2xl focus:ring-2 focus:ring-[#007AFF]/20 transition-all text-[15px]"
-                        placeholder="Prénom Nom"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
+                {/* Section Admin — masquée en mode édition */}
+                {!editMode && (
+                  <div className="space-y-4 pt-6 border-t border-black/5">
+                    <h3 className="text-[14px] font-bold text-[#1D1D1F] uppercase tracking-wider flex items-center gap-2">
+                      <User className="w-4 h-4 text-[#34C759]" />
+                      Compte Administrateur Agence
+                    </h3>
                     <div className="space-y-1.5">
-                      <label className="text-[13px] font-semibold text-[#1D1D1F] ml-1">Email professionnel</label>
+                      <label className="text-[13px] font-semibold text-[#1D1D1F] ml-1">Nom complet du Gérant</label>
                       <div className="relative">
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#86868B]" />
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#86868B]" />
                         <input 
-                          type="email"
-                          required
-                          value={formData.admin_email}
-                          onChange={e => setFormData({...formData, admin_email: e.target.value})}
+                          required={!editMode}
+                          value={formData.admin_name}
+                          onChange={e => setFormData({...formData, admin_name: e.target.value})}
                           className="w-full h-12 pl-12 pr-4 bg-[#F5F5F7] border-0 rounded-2xl focus:ring-2 focus:ring-[#007AFF]/20 transition-all text-[15px]"
-                          placeholder="admin@agence.com"
+                          placeholder="Prénom Nom"
                         />
                       </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[13px] font-semibold text-[#1D1D1F] ml-1">Mot de passe provisoire</label>
-                      <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#86868B]" />
-                        <input 
-                          type="password"
-                          required
-                          value={formData.admin_password}
-                          onChange={e => setFormData({...formData, admin_password: e.target.value})}
-                          className="w-full h-12 pl-12 pr-4 bg-[#F5F5F7] border-0 rounded-2xl focus:ring-2 focus:ring-[#007AFF]/20 transition-all text-[15px]"
-                          placeholder="••••••••"
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[13px] font-semibold text-[#1D1D1F] ml-1">Email professionnel</label>
+                        <div className="relative">
+                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#86868B]" />
+                          <input 
+                            type="email"
+                            required={!editMode}
+                            value={formData.admin_email}
+                            onChange={e => setFormData({...formData, admin_email: e.target.value})}
+                            className="w-full h-12 pl-12 pr-4 bg-[#F5F5F7] border-0 rounded-2xl focus:ring-2 focus:ring-[#007AFF]/20 transition-all text-[15px]"
+                            placeholder="admin@agence.com"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[13px] font-semibold text-[#1D1D1F] ml-1">Mot de passe provisoire</label>
+                        <div className="relative">
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#86868B]" />
+                          <input 
+                            type="password"
+                            required={!editMode}
+                            value={formData.admin_password}
+                            onChange={e => setFormData({...formData, admin_password: e.target.value})}
+                            className="w-full h-12 pl-12 pr-4 bg-[#F5F5F7] border-0 rounded-2xl focus:ring-2 focus:ring-[#007AFF]/20 transition-all text-[15px]"
+                            placeholder="••••••••"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 <button 
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full h-14 bg-[#007AFF] text-white rounded-[20px] font-bold text-[16px] hover:bg-[#0063CC] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2"
+                  className={`w-full h-14 text-white rounded-[20px] font-bold text-[16px] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2 ${
+                    editMode ? 'bg-[#007AFF] hover:bg-[#0063CC]' : 'bg-[#007AFF] hover:bg-[#0063CC]'
+                  }`}
                 >
                   {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
-                  Créer l'agence et son administrateur
+                  {editMode ? 'Enregistrer les modifications' : "Créer l'agence et son administrateur"}
                 </button>
               </form>
             </motion.div>
