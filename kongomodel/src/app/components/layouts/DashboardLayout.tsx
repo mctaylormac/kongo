@@ -245,6 +245,14 @@ export function DashboardLayout() {
     { label: 'Paramètres', icon: Settings, id: '/settings' },
   ];
 
+  const isItemActive = (itemId: string) => {
+    const currentFull = location.pathname + location.search;
+    if (itemId.includes('?')) {
+      return currentFull === itemId;
+    }
+    return location.pathname === itemId && (!location.search || location.search === '?tab=all');
+  };
+
   return (
     <div className="flex h-screen bg-[#F5F5F7] text-[#1D1D1F] overflow-hidden font-sans selection:bg-[#5CB338]/30">
       {/* Desktop Sidebar */}
@@ -280,7 +288,7 @@ export function DashboardLayout() {
                 key={item.id}
                 icon={item.icon}
                 label={item.label}
-                isActive={location.pathname === item.id}
+                isActive={isItemActive(item.id)}
                 onClick={() => {
                   navigate(item.id);
                   setIsMobileMenuOpen(false);
@@ -473,7 +481,7 @@ export function DashboardLayout() {
                         key={item.id}
                         icon={item.icon}
                         label={item.label}
-                        isActive={location.pathname === item.id}
+                        isActive={isItemActive(item.id)}
                         onClick={() => {
                           navigate(item.id);
                           setIsMobileMenuOpen(false);

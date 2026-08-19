@@ -47,20 +47,29 @@ export function AgencyManagement() {
     admin_password: "",
     admin_name: ""
   });
+  const [selectedCountryFilter, setSelectedCountryFilter] = useState<string>("all");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchAgencies();
+  }, []);
+
+  // Synchroniser l'onglet actif selon la query string de l'URL (?tab=featured ou pas)
+  useEffect(() => {
     const updateTabFromUrl = () => {
       const params = new URLSearchParams(window.location.search);
       if (params.get('tab') === 'featured') {
         setActiveTab('featured');
+      } else {
+        setActiveTab('all');
       }
     };
     updateTabFromUrl();
-  }, []);
+    window.addEventListener('popstate', updateTabFromUrl);
+    return () => window.removeEventListener('popstate', updateTabFromUrl);
+  }, [window.location.search]);
 
   const fetchAgencies = async () => {
     setIsLoading(true);
@@ -260,6 +269,12 @@ export function AgencyManagement() {
   const filteredAgencies = agencies.filter(a => {
     const matchesSearch = a.name.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
+
+    if (selectedCountryFilter !== 'all') {
+      const code = (a.country_code || 'RDC').toUpperCase();
+      if (code !== selectedCountryFilter) return false;
+    }
+
     if (activeTab === 'featured') return a.is_trusted;
     if (activeTab === 'active') return a.status === 'active';
     if (activeTab === 'suspended') return a.status === 'suspended';
@@ -372,16 +387,32 @@ export function AgencyManagement() {
           </button>
         </div>
 
-        {/* Search */}
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
-          <input 
-            type="text"
-            placeholder="Chercher agence..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-9 pl-9 pr-3 bg-white border border-black/10 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 transition-all"
-          />
+        {/* Search & Country Filter */}
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          {/* Filtre Pays */}
+          <select
+            value={selectedCountryFilter}
+            onChange={(e) => setSelectedCountryFilter(e.target.value)}
+            className="h-9 px-3 bg-white border border-black/10 rounded-xl text-[13px] font-medium text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 cursor-pointer shadow-sm"
+          >
+            <option value="all">🌐 Tous les pays</option>
+            <option value="RDC">🇨🇩 RDC (Kinshasa, Lubumbashi...)</option>
+            <option value="CG">🇨🇬 Congo-Brazzaville</option>
+            <option value="CM">🇨🇲 Cameroun</option>
+            <option value="CI">🇨🇮 Côte d'Ivoire</option>
+            <option value="GA">🇬🇦 Gabon</option>
+          </select>
+
+          <div className="relative flex-1 sm:w-64">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
+            <input 
+              type="text"
+              placeholder="Chercher agence..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-9 pl-9 pr-3 bg-white border border-black/10 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 transition-all"
+            />
+          </div>
         </div>
       </div>
 
