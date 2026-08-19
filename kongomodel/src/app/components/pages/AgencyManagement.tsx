@@ -344,6 +344,9 @@ export function AgencyManagement() {
           await supabase.from('trips').delete().eq('agency_id', agency.id);
         }
 
+        await supabase.from('driver_reports').delete().eq('agency_id', agency.id);
+        await supabase.from('drivers').delete().eq('agency_id', agency.id);
+        await supabase.from('staff').delete().eq('agency_id', agency.id);
         await supabase.from('buses').delete().eq('agency_id', agency.id);
         await supabase.from('agency_reviews').delete().eq('agency_id', agency.id);
         await supabase.from('extra_services').delete().eq('agency_id', agency.id);

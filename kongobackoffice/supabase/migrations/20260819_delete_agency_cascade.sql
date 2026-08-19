@@ -2,6 +2,17 @@
 -- Migration: Function to cascade delete agency and all related data
 -- ============================================================
 
+-- rendre agency_id optionnel sur drivers et profiles si nécessaire
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'drivers' AND column_name = 'agency_id') THEN
+    ALTER TABLE public.drivers ALTER COLUMN agency_id DROP NOT NULL;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'agency_id') THEN
+    ALTER TABLE public.profiles ALTER COLUMN agency_id DROP NOT NULL;
+  END IF;
+END $$;
+
 CREATE OR REPLACE FUNCTION public.delete_agency_cascade(p_agency_id UUID)
 RETURNS void
 LANGUAGE plpgsql
@@ -31,16 +42,29 @@ BEGIN
     DELETE FROM public.trips WHERE agency_id = p_agency_id;
   END IF;
 
-  -- 3. Supprimer les dépendances directes de l'agence
+  -- 3. Supprimer les chauffeurs et rapports liés à l'agence
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'driver_reports') THEN
+    DELETE FROM public.driver_reports WHERE agency_id = p_agency_id;
+  END IF;
+
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'drivers') THEN
+    DELETE FROM public.drivers WHERE agency_id = p_agency_id;
+  END IF;
+
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'staff') THEN
+    DELETE FROM public.staff WHERE agency_id = p_agency_id;
+  END IF;
+
+  -- 4. Supprimer les dépendances directes de l'agence
   DELETE FROM public.buses WHERE agency_id = p_agency_id;
   DELETE FROM public.agency_reviews WHERE agency_id = p_agency_id;
   DELETE FROM public.extra_services WHERE agency_id = p_agency_id;
   DELETE FROM public.notifications WHERE agency_id = p_agency_id;
 
-  -- 4. Détacher les utilisateurs/profiles associés à cette agence
+  -- 5. Détacher les utilisateurs/profiles associés à cette agence
   UPDATE public.profiles SET agency_id = NULL WHERE agency_id = p_agency_id;
 
-  -- 5. Supprimer l'agence
+  -- 6. Supprimer l'agence
   DELETE FROM public.agencies WHERE id = p_agency_id;
 END;
 $$;
