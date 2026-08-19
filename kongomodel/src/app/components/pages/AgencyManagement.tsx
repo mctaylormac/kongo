@@ -323,43 +323,63 @@ export function AgencyManagement() {
       if (rpcErr) {
         console.warn("RPC delete_agency_cascade fallback:", rpcErr);
 
-        // 2. Cascade client-side si la fonction RPC n'est pas encore appliquée en base
+        // Helper sécurisé : ignore les erreurs 404/400 sur tables optionnelles ou inexistantes
+        const safeDelete = async (promise: Promise<any>) => {
+          try {
+            const res = await promise;
+            if (res?.error) console.warn("Safe delete note:", res.error.message);
+          } catch (e) {
+            console.warn("Safe delete exception:", e);
+          }
+        };
+
+        // a. Récupérer les bus et voyages de l'agence
+        const { data: buses } = await supabase.from('buses').select('id').eq('agency_id', agency.id);
+        const busIds = (buses || []).map(b => b.id);
+
         const { data: trips } = await supabase.from('trips').select('id').eq('agency_id', agency.id);
         const tripIds = (trips || []).map(t => t.id);
 
+        // b. Supprimer réservations et billets associés
         if (tripIds.length > 0) {
           const { data: bookings } = await supabase.from('bookings').select('id').in('trip_id', tripIds);
           const bookingIds = (bookings || []).map(b => b.id);
 
           if (bookingIds.length > 0) {
-            await supabase.from('ticket_scans').delete().in('booking_id', bookingIds);
-            await supabase.from('booking_passengers').delete().in('booking_id', bookingIds);
-            await supabase.from('payments').delete().in('booking_id', bookingIds);
-            await supabase.from('bookings').delete().in('trip_id', tripIds);
+            await safeDelete(supabase.from('ticket_scans').delete().in('booking_id', bookingIds));
+            await safeDelete(supabase.from('booking_passengers').delete().in('booking_id', bookingIds));
+            await safeDelete(supabase.from('payments').delete().in('booking_id', bookingIds));
+            await safeDelete(supabase.from('bookings').delete().in('trip_id', tripIds));
           }
 
-          await supabase.from('trip_reviews').delete().in('trip_id', tripIds);
-          await supabase.from('incidents').delete().in('trip_id', tripIds);
-          await supabase.from('driver_assignments').delete().in('trip_id', tripIds);
-          await supabase.from('trips').delete().eq('agency_id', agency.id);
+          await safeDelete(supabase.from('trip_reviews').delete().in('trip_id', tripIds));
+          await safeDelete(supabase.from('incidents').delete().in('trip_id', tripIds));
+          await safeDelete(supabase.from('driver_assignments').delete().in('trip_id', tripIds));
+          await safeDelete(supabase.from('trips').delete().eq('agency_id', agency.id));
         }
 
-        await supabase.from('driver_reports').delete().eq('agency_id', agency.id);
-        await supabase.from('drivers').delete().eq('agency_id', agency.id);
-        await supabase.from('staff').delete().eq('agency_id', agency.id);
-        await supabase.from('buses').delete().eq('agency_id', agency.id);
-        await supabase.from('agency_reviews').delete().eq('agency_id', agency.id);
-        await supabase.from('extra_services').delete().eq('agency_id', agency.id);
-        await supabase.from('notifications').delete().eq('agency_id', agency.id);
-        await supabase.from('profiles').update({ agency_id: null }).eq('agency_id', agency.id);
+        // c. Supprimer les chauffeurs et leurs rapports
+        await safeDelete(supabase.from('driver_reports').delete().eq('agency_id', agency.id));
+        await safeDelete(supabase.from('drivers').delete().eq('agency_id', agency.id));
+        if (busIds.length > 0) {
+          await safeDelete(supabase.from('drivers').delete().in('assigned_bus_id', busIds));
+        }
 
+        // d. Supprimer bus, avis agence, services extra, notifications
+        await safeDelete(supabase.from('buses').delete().eq('agency_id', agency.id));
+        await safeDelete(supabase.from('agency_reviews').delete().eq('agency_id', agency.id));
+        await safeDelete(supabase.from('extra_services').delete().eq('agency_id', agency.id));
+        await safeDelete(supabase.from('notifications').delete().eq('agency_id', agency.id));
+        await safeDelete(supabase.from('profiles').update({ agency_id: null }).eq('agency_id', agency.id));
+
+        // e. Supprimer l'agence enfin
         const { error: finalErr } = await supabase.from('agencies').delete().eq('id', agency.id);
         if (finalErr) throw finalErr;
       }
 
       setAgencies(prev => prev.filter(a => a.id !== agency.id));
       setSelectedAgency(null);
-      toast.success(`Agence "${agency.name}" et toutes ses données associées ont été supprimées.`);
+      toast.success(`Agence "${agency.name}" et toutes ses données associées ont été supprimées avec succès !`);
     } catch (err: any) {
       console.error("Delete error:", err);
       toast.error(err.message || "Erreur lors de la suppression de l'agence");
