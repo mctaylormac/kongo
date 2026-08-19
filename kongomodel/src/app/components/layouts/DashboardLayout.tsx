@@ -186,7 +186,7 @@ export function DashboardLayout() {
        return [
          { id: '/', label: 'Global Audit', icon: LayoutDashboard },
          { id: '/agency-management', label: 'Agences Partenaires', icon: Briefcase },
-         { id: '/agency-management?tab=featured', label: 'Mise en Avant Agences ⭐', icon: Star },
+         { id: '/featured-agencies', label: 'Mise en Avant Agences ⭐', icon: Star },
          { id: '/trips', label: 'Planification', icon: Map },
          { id: '/buses', label: 'Flotte Totale', icon: Bus },
          { id: '/bookings', label: 'Réservations', icon: Ticket },

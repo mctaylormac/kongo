@@ -33,7 +33,7 @@ export function AgencyManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAgency, setSelectedAgency] = useState<Agency | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<'all' | 'featured' | 'active' | 'suspended'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'active' | 'suspended'>('all');
   
   // Form State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,21 +55,6 @@ export function AgencyManagement() {
   useEffect(() => {
     fetchAgencies();
   }, []);
-
-  // Synchroniser l'onglet actif selon la query string de l'URL (?tab=featured ou pas)
-  useEffect(() => {
-    const updateTabFromUrl = () => {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('tab') === 'featured') {
-        setActiveTab('featured');
-      } else {
-        setActiveTab('all');
-      }
-    };
-    updateTabFromUrl();
-    window.addEventListener('popstate', updateTabFromUrl);
-    return () => window.removeEventListener('popstate', updateTabFromUrl);
-  }, [window.location.search]);
 
   const fetchAgencies = async () => {
     setIsLoading(true);
@@ -275,7 +260,6 @@ export function AgencyManagement() {
       if (code !== selectedCountryFilter) return false;
     }
 
-    if (activeTab === 'featured') return a.is_trusted;
     if (activeTab === 'active') return a.status === 'active';
     if (activeTab === 'suspended') return a.status === 'suspended';
     return true;
@@ -364,18 +348,6 @@ export function AgencyManagement() {
           </button>
 
           <button
-            onClick={() => setActiveTab('featured')}
-            className={`px-4 py-2 rounded-xl text-[13px] font-bold flex items-center gap-2 transition-all ${
-              activeTab === 'featured'
-                ? 'bg-amber-500 text-white shadow-sm'
-                : 'bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100'
-            }`}
-          >
-            <Star className={`w-4 h-4 ${activeTab === 'featured' ? 'fill-white text-white' : 'fill-amber-600 text-amber-600'}`} />
-            <span>Mises en Avant (Agences de Confiance) ⭐ ({agencies.filter(a => a.is_trusted).length})</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('active')}
             className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all ${
               activeTab === 'active'
@@ -416,20 +388,6 @@ export function AgencyManagement() {
         </div>
       </div>
 
-      {/* Banner d'information */}
-      {activeTab === 'featured' && (
-        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-            <Star className="w-5 h-5 text-amber-600 fill-amber-500" />
-          </div>
-          <div className="text-[13px] text-amber-900">
-            <p className="font-bold text-[14px]">Agences Mises en Avant (Agences de Confiance sur Mobile) ⭐</p>
-            <p className="mt-0.5">
-              Les agences avec la marque ⭐ apparaissent directement en haut sur l'écran d'accueil de l'application mobile KonGO. Cliquez sur <strong>"Mettre en avant"</strong> pour ajouter ou retirer une agence.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

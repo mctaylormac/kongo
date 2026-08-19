@@ -19,6 +19,7 @@ import { NewBooking } from "./components/pages/NewBooking";
 import { Login } from "./components/pages/Login";
 import { ExtraServices } from "./components/pages/ExtraServices";
 import { AgencyManagement } from "./components/pages/AgencyManagement";
+import { FeaturedAgencies } from "./components/pages/FeaturedAgencies";
 import { Incidents } from "./components/pages/Incidents";
 import { Scanner } from "./components/pages/Scanner";
 import { SuperuserChat } from "./components/pages/SuperuserChat";
@@ -43,6 +44,10 @@ export const router = createBrowserRouter([
       { 
         path: "agency-management", 
         element: <RoleGuard allowedRoles={["superuser"]}><AgencyManagement /></RoleGuard> 
+      },
+      { 
+        path: "featured-agencies", 
+        element: <RoleGuard allowedRoles={["superuser"]}><FeaturedAgencies /></RoleGuard> 
       },
       { 
         path: "users", 
