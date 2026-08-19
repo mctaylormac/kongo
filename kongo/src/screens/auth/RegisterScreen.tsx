@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { User, Phone, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react-native';
 import { PhoneInput } from '../../components/PhoneInput';
 import { useCountry } from '../../context/CountryContext';
+import { supabase } from '../../lib/supabase';
 
 export default function RegisterScreen({ navigation }: any) {
   const { selectedCountry } = useCountry();
@@ -103,13 +104,10 @@ export default function RegisterScreen({ navigation }: any) {
         );
       }
     } else {
-      // Succès total avec connexion directe
-      showToast('success', 'La création de compte s\'est bien passée !');
-      Alert.alert(
-        'Succès',
-        'La création de compte s\'est bien passée !',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      // Succès total : session active, on ferme la modal et on va sur le Profil
+      showToast('success', 'Bienvenue sur KonGO ! Votre compte est créé.');
+      // Naviguer vers l'onglet Profile (session déjà active via Supabase Auth)
+      navigation.navigate('Main', { screen: 'Profile' });
     }
   }
 
