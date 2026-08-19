@@ -71,6 +71,7 @@ export default function ResultsScreen({ route, navigation }: any) {
         .from('trips')
         .select(`
           *,
+          total_seats,
           agencies(name, rating, logo_url),
           origin:locations!origin_location_id!inner(name),
           destination:locations!destination_location_id!inner(name)
@@ -97,25 +98,46 @@ export default function ResultsScreen({ route, navigation }: any) {
       const { data, error } = await query.order('departure_time', { ascending: true });
 
       if (error) throw error;
+      if (!data || data.length === 0) { setResults([]); return; }
 
-      const mapped = (data || []).map(item => ({
-        id: item.id,
-        agency: item.agencies?.name || 'KonGO Express',
-        logo: item.agencies?.logo_url ? { uri: item.agencies.logo_url } : require('../../assets/logo1.png'),
-        departure: item.departure_time ? new Date(item.departure_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '08:00',
-        arrival: item.arrival_time ? new Date(item.arrival_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '14:00',
-        duration: item.duration || '6h00',
-        class: item.bus_type || 'Standard',
-        price: item.price,
-        amenities: item.amenities || ['wifi', 'ac'],
-        seats: item.seats_available,
-        originName: item.origin?.name || from,
-        destName: item.destination?.name || to,
-        date: item.departure_time ? new Date(item.departure_time).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '',
-        promoAlert: item.is_popular,
-        agency_id: item.agency_id,
-        handicap_seats: item.handicap_seats || 0,
-      }));
+      // Récupérer le nombre de réservations confirmées pour chaque trip
+      const tripIds = data.map((t: any) => t.id);
+      const { data: bookingCounts } = await supabase
+        .from('bookings')
+        .select('trip_id')
+        .in('trip_id', tripIds)
+        .in('status', ['confirmed', 'pending', 'completed']);
+
+      // Calculer le nombre de réservations par trip
+      const bookedMap: Record<string, number> = {};
+      (bookingCounts || []).forEach((b: any) => {
+        bookedMap[b.trip_id] = (bookedMap[b.trip_id] || 0) + 1;
+      });
+
+      const mapped = (data || []).map((item: any) => {
+        const totalSeats = item.total_seats ?? item.seats_available ?? 50;
+        const booked = bookedMap[item.id] || 0;
+        const remaining = Math.max(0, totalSeats - booked);
+        return {
+          id: item.id,
+          agency: item.agencies?.name || 'KonGO Express',
+          logo: item.agencies?.logo_url ? { uri: item.agencies.logo_url } : require('../../assets/logo1.png'),
+          departure: item.departure_time ? new Date(item.departure_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '08:00',
+          arrival: item.arrival_time ? new Date(item.arrival_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '14:00',
+          duration: item.duration || '6h00',
+          class: item.bus_type || 'Standard',
+          price: item.price,
+          amenities: item.amenities || ['wifi', 'ac'],
+          seats: remaining,
+          totalSeats,
+          originName: item.origin?.name || from,
+          destName: item.destination?.name || to,
+          date: item.departure_time ? new Date(item.departure_time).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '',
+          promoAlert: item.is_popular,
+          agency_id: item.agency_id,
+          handicap_seats: item.handicap_seats || 0,
+        };
+      });
 
       setResults(mapped);
     } catch (err) {
