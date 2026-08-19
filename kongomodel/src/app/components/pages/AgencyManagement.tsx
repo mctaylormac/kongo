@@ -122,6 +122,24 @@ export function AgencyManagement() {
     setLogoPreview(URL.createObjectURL(file));
   };
 
+  const openCreateModal = () => {
+    setEditMode(false);
+    setSelectedAgency(null);
+    setFormData({
+      name: "",
+      commission_rate: 5,
+      description: "",
+      country: "République Démocratique du Congo",
+      country_code: "RDC",
+      admin_email: "",
+      admin_password: "",
+      admin_name: ""
+    });
+    setLogoFile(null);
+    setLogoPreview(null);
+    setIsModalOpen(true);
+  };
+
   const openEditModal = (agency: Agency) => {
     setEditMode(true);
     setFormData({
@@ -144,17 +162,26 @@ export function AgencyManagement() {
     setIsSubmitting(true);
 
     try {
-      // Upload logo si nouveau fichier sélectionné
+      // Upload logo si nouveau fichier sélectionné (avec fallback Data URL si le bucket storage échoue)
       let uploadedLogoUrl: string | null = null;
       if (logoFile) {
-        const fileExt = logoFile.name.split('.').pop();
-        const fileName = `agencies/logo_${Date.now()}.${fileExt}`;
-        const { error: uploadErr } = await supabase.storage.from('app-assets').upload(fileName, logoFile);
-        if (uploadErr) {
-          console.warn("Storage error, using fallback URL:", uploadErr);
-        } else {
-          const { data: publicData } = supabase.storage.from('app-assets').getPublicUrl(fileName);
-          uploadedLogoUrl = publicData.publicUrl;
+        try {
+          const fileExt = logoFile.name.split('.').pop();
+          const fileName = `agencies/logo_${Date.now()}.${fileExt}`;
+          const { error: uploadErr } = await supabase.storage.from('app-assets').upload(fileName, logoFile, { upsert: true });
+          if (!uploadErr) {
+            const { data: publicData } = supabase.storage.from('app-assets').getPublicUrl(fileName);
+            uploadedLogoUrl = publicData.publicUrl;
+          } else {
+            console.warn("Storage upload warning, using Data URL fallback:", uploadErr);
+            uploadedLogoUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(logoFile);
+            });
+          }
+        } catch (imgErr) {
+          console.warn("Image conversion error:", imgErr);
         }
       }
 
@@ -309,7 +336,7 @@ export function AgencyManagement() {
           <p className="text-[15px] text-[#86868B] mt-1">Gérez les partenaires et définissez les agences qui apparaissent dans "Agences de Confiance" sur mobile.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={openCreateModal}
           className="h-11 px-5 bg-[#007AFF] text-white rounded-xl flex items-center gap-2 hover:bg-[#0063CC] transition-all shadow-sm hover:shadow-md"
         >
           <Plus className="w-5 h-5" />
